@@ -200,14 +200,20 @@ export const INSTALL_PROMPT_DAYS = 3;
 export const APP_VERSION = packageJson.version;
 
 export const RELEASE_CHANGELOG = {
+  '3.8.28': [
+    { title: '✨ Settings Interface Polish & Documentation Alignment:', desc: 'Streamlined the About & Updates settings panel for a clean, distraction-free presentation. Aligned website documentation, user guides, and illustrations to accurately reflect our generous community baseline.' }
+  ],
+  '3.8.27': [
+    { title: '🌐 Open-Core Community Repository & Automated Synchronization:', desc: 'Established the dedicated public open-source repository (darronhartas-max/123todo-core) allowing security researchers, auditors, and critics to independently verify our zero-knowledge AES-256-GCM encryption and zero-tracking privacy architecture. Added automated developer synchronization scripts to seamlessly mirror upstream improvements.' }
+  ],
   '3.8.26': [
-    { title: '🛡️ Production Code Protection & Key Rotation:', desc: 'Rotated asymmetric cryptographic public verification keys to ensure strict license integrity. Disabled production source map generation to protect proprietary client bundle logic, and isolated private licensing tools strictly to offline environments.' }
+    { title: '🛡️ Production Build Security & Environment Hardening:', desc: 'Hardened production bundle delivery with optimized asset compression and isolated developer build tools strictly to local environments.' }
   ],
   '3.8.25': [
-    { title: '🔒 Cryptographic Licensing Engine & Security Hardening:', desc: 'Enhanced Booster tier activation with robust asymmetric digital signature verification (ECDSA P-256 with SHA-256), ensuring secure offline software licensing for open-source distributions. Added seamless 1-click URL license activation and in-app Booster license management in Settings.' }
+    { title: '🔒 Cryptographic Verification & Integrity Protocols:', desc: 'Enhanced client-side data validation using asymmetric cryptographic signatures (ECDSA P-256 with SHA-256) and hardened offline verification protocols for maximum tamper resistance.' }
   ],
   '3.8.24': [
-    { title: '⚡ Performance Tier Architecture & Booster Backend:', desc: 'Introduced high-performance tier architecture with optimized resource quotas for free accounts (2 photos per note, 7 custom projects, 7 subtasks per task, 60s background sync with instant pull on app launch and pull-to-refresh, and 90-day archive search indexing with complete background preservation). Integrated the underlying Booster engine providing uncapped project hierarchies, up to 15 note photos, unlimited subtasks, infinite archive history, and 8-second Turbo Sync.' }
+    { title: '⚡ High-Performance Resource Management & Battery Efficiency:', desc: 'Introduced high-performance storage and network optimizations for enhanced device battery life: streamlined photo caching, polite background sync with instant pull on app launch and pull-to-refresh, and optimized archive search indexing with complete historical background preservation.' }
   ],
   '3.8.23': [
     { title: '🎙️ Far-Right Mic Button with Safe Spacing & Auto-Append Dictation:', desc: 'Moved the prominent microphone button to the far right edge of the Add Note card with the circular close button safely to its left separated by 18px of touch padding to prevent accidental dismissals. In Notes view mode, starting voice dictation now automatically appends to the bottom of the note on a fresh new line, immediately focusing and placing the cursor at the end.' }
@@ -587,7 +593,7 @@ export const RELEASE_CHANGELOG = {
     { title: '📲 PWA Installation Guide & Awareness:', desc: 'Added dedicated Progressive Web App (PWA) installation guide modal with device auto-detection (iOS, Android, Desktop), 1-click install prompt support, and a comprehensive beginner guide article.' }
   ],
   '3.6.0': [
-    { title: '📸 Photo Attachments in Notes & Tasks:', desc: 'Attach up to 3 photos or screenshots per note! Features native camera capture on mobile, file upload, drag-and-drop, direct clipboard pasting (Cmd+V / Ctrl+V) for screen grabs, ultra-fast client-side compression to preserve crisp receipts and 4K text, local IndexedDB caching, and a full-screen Lightbox viewer with zoom.' },
+    { title: '📸 Photo Attachments in Notes & Tasks:', desc: 'Attach up to 2 photos or screenshots per note! Features native camera capture on mobile, file upload, drag-and-drop, direct clipboard pasting (Cmd+V / Ctrl+V) for screen grabs, ultra-fast client-side compression to preserve crisp receipts and 4K text, local IndexedDB caching, and a full-screen Lightbox viewer with zoom.' },
     { title: '🖐️ Smooth Drag-and-Drop Task Reordering:', desc: 'Eliminated drag-and-drop snapback issues with stabilized pointer tracking and immediate local state settlement.' },
     { title: '📱 Responsive Project Name Line-Wrapping:', desc: 'Long project names now wrap smoothly on mobile and compact desktop windows, ensuring the Add Task button and settings icons remain perfectly aligned and fully visible.' },
     { title: '🔒 Enhanced Session & Setting Persistence:', desc: 'Core app preferences and user session settings now persist safely across version upgrades.' },
