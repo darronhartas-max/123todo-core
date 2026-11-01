@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Info, Check, Sparkles, RefreshCw, Building2, Download, CheckCircle2, Smartphone, Laptop, BookOpen, ExternalLink, ShieldCheck, X } from 'lucide-react';
+import React from 'react';
+import { Info, Check, Sparkles, RefreshCw, Building2, Download, CheckCircle2, Smartphone, Laptop, BookOpen, ExternalLink } from 'lucide-react';
 import { APP_VERSION } from '../../../utils/constants';
-import { isBoosterActive, getBoosterLicenseInfo, activateBoosterLicense, deactivateBoosterLicense } from '../../../utils/booster';
+import { isBoosterActive } from '../../../utils/booster';
 import { useTenant } from '../../../context/TenantContext';
 
 const SettingsAboutTab = ({

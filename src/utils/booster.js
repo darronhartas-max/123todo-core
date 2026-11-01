@@ -1,5 +1,3 @@
-import { STORAGE_KEYS } from './constants';
-
 /**
  * 123 To Do (Community Core Edition) — Resource Quotas & Limits
  *
