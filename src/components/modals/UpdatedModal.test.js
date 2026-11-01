@@ -1,0 +1,116 @@
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import UpdatedModal from './UpdatedModal';
+import { APP_VERSION } from '../../utils/constants';
+
+describe('UpdatedModal', () => {
+  test('renders previous and current versions when versions differ', () => {
+    render(
+      <UpdatedModal
+        oldVersion="3.6.12"
+        newVersion="3.6.20"
+        onClose={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('123 To Do Updated!')).toBeInTheDocument();
+    expect(screen.getByText('PREVIOUS')).toBeInTheDocument();
+    expect(screen.getByText('v3.6.12')).toBeInTheDocument();
+    expect(screen.getByText('CURRENT')).toBeInTheDocument();
+    expect(screen.getByText('v3.6.20')).toBeInTheDocument();
+    expect(screen.getByText("✨ What's New in v3.6.20:")).toBeInTheDocument();
+  });
+
+  test('renders single current version badge cleanly without duplicate when oldVersion equals newVersion', () => {
+    render(
+      <UpdatedModal
+        oldVersion="3.6.20"
+        newVersion="3.6.20"
+        onClose={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('123 To Do Updated!')).toBeInTheDocument();
+    expect(screen.queryByText('PREVIOUS')).not.toBeInTheDocument();
+    expect(screen.getByText('CURRENT VERSION')).toBeInTheDocument();
+    expect(screen.getByText('v3.6.20')).toBeInTheDocument();
+  });
+
+  test('calls onClose when Awesome, Let\'s Go! button is clicked', () => {
+    const onCloseMock = jest.fn();
+    render(
+      <UpdatedModal
+        oldVersion="3.6.12"
+        newVersion={APP_VERSION}
+        onClose={onCloseMock}
+      />
+    );
+
+    const closeButton = screen.getByRole('button', { name: /Awesome, Let's Go!/i });
+    expect(closeButton).toBeInTheDocument();
+    fireEvent.click(closeButton);
+
+    expect(onCloseMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('calls onClose when X close button is clicked', () => {
+    const onCloseMock = jest.fn();
+    render(
+      <UpdatedModal
+        newVersion={APP_VERSION}
+        onClose={onCloseMock}
+      />
+    );
+
+    const xButton = screen.getByLabelText('Close modal');
+    expect(xButton).toBeInTheDocument();
+    fireEvent.click(xButton);
+
+    expect(onCloseMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('calls onClose when bottom Close button is clicked', () => {
+    const onCloseMock = jest.fn();
+    render(
+      <UpdatedModal
+        newVersion={APP_VERSION}
+        onClose={onCloseMock}
+      />
+    );
+
+    const closeButton = screen.getByRole('button', { name: 'Close' });
+    expect(closeButton).toBeInTheDocument();
+    fireEvent.click(closeButton);
+
+    expect(onCloseMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('displays info of the last 5 versions updated', () => {
+    render(
+      <UpdatedModal
+        newVersion={APP_VERSION}
+        onClose={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('123 To Do Updated!')).toBeInTheDocument();
+    expect(screen.getByText(`✨ What's New in v${APP_VERSION}:`)).toBeInTheDocument();
+    expect(screen.getByText('Latest')).toBeInTheDocument();
+    // 5 version sections displayed
+    expect(screen.getAllByText(/✨ What's New in v/i).length).toBe(5);
+  });
+
+  test('renders external link to full release changelog', () => {
+    render(
+      <UpdatedModal
+        newVersion={APP_VERSION}
+        onClose={jest.fn()}
+      />
+    );
+
+    const link = screen.getByRole('link', { name: /View Full Release Changelog/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', 'https://www.123todo.com/changelog');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+});

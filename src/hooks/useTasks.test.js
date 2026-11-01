@@ -1,0 +1,405 @@
+import { renderHook, act } from '@testing-library/react';
+import { useTasks } from './useTasks';
+
+describe('useTasks - reorderTasks drag and drop', () => {
+    beforeEach(() => {
+        localStorage.clear();
+    });
+
+    test('reorders tasks within the same priority section when dragged down', () => {
+        const initialTasks = [
+            { id: 1, text: 'Task 1', priority: 1, projectId: 'general' },
+            { id: 2, text: 'Task 2', priority: 1, projectId: 'general' },
+            { id: 3, text: 'Task 3', priority: 1, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        // Drag Task 1 down onto Task 3 -> Task 1 should end up before Task 3 (where top indicator line was displayed)
+        act(() => {
+            result.current.reorderTasks(1, 3);
+        });
+
+        expect(result.current.tasks.map(t => t.id)).toEqual([2, 1, 3]);
+    });
+
+    test('reorders tasks within the same priority section when dragged up', () => {
+        const initialTasks = [
+            { id: 1, text: 'Task 1', priority: 1, projectId: 'general' },
+            { id: 2, text: 'Task 2', priority: 1, projectId: 'general' },
+            { id: 3, text: 'Task 3', priority: 1, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        // Drag Task 3 up onto Task 1 -> Task 3 should end up before Task 1
+        act(() => {
+            result.current.reorderTasks(3, 1);
+        });
+
+        expect(result.current.tasks.map(t => t.id)).toEqual([3, 1, 2]);
+    });
+
+    test('preserves task projectId when dragging and dropping tasks to a new position', () => {
+        const initialTasks = [
+            { id: 101, text: 'Work Task', priority: 1, projectId: 'work' },
+            { id: 102, text: 'Personal Task', priority: 1, projectId: 'personal' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        // Drag Work Task (id 101) onto Personal Task (id 102)
+        act(() => {
+            result.current.reorderTasks(101, 102);
+        });
+
+        const movedWorkTask = result.current.tasks.find(t => t.id === 101);
+        expect(movedWorkTask.projectId).toBe('work'); // projectId MUST NOT change to 'personal'!
+    });
+
+    test('changes priority when dragging task onto a different priority container', () => {
+        const initialTasks = [
+            { id: 1, text: 'Task 1', priority: 1, projectId: 'general' },
+            { id: 2, text: 'Task 2', priority: 2, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        // Drag Task 1 onto priority-2 container
+        act(() => {
+            result.current.reorderTasks(1, 'priority-2');
+        });
+
+        const moved = result.current.tasks.find(t => t.id === 1);
+        expect(moved.priority).toBe(2);
+    });
+
+    test('adds new tasks at the top of the item list', () => {
+        const initialTasks = [
+            { id: 1, text: 'Existing Task 1', priority: 1, projectId: 'general' },
+            { id: 2, text: 'Existing Task 2', priority: 1, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.addTask('Brand New Top Task', 1, 'general');
+        });
+
+        expect(result.current.tasks[0].text).toBe('Brand New Top Task');
+    });
+
+    test('reorders On Hold (priority 4) tasks via drag and drop', () => {
+        const initialTasks = [
+            { id: 401, text: 'On Hold A', priority: 4, projectId: 'general' },
+            { id: 402, text: 'On Hold B', priority: 4, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        // Drag On Hold B up onto On Hold A
+        act(() => {
+            result.current.reorderTasks(402, 401);
+        });
+
+        const onHoldTasks = result.current.tasks.filter(t => t.priority === 4);
+        expect(onHoldTasks.map(t => t.id)).toEqual([402, 401]);
+    });
+
+    test('handles string and number ID mismatch gracefully during drag and drop', () => {
+        const initialTasks = [
+            { id: 10, text: 'Task A', priority: 1, projectId: 'general' },
+            { id: 20, text: 'Task B', priority: 3, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        // Drag Task B (id 20) with string ID '20' onto Task A (id 10) with number ID 10
+        act(() => {
+            result.current.reorderTasks('20', 10);
+        });
+
+        const moved = result.current.tasks.find(t => String(t.id) === '20');
+        expect(moved.priority).toBe(1);
+    });
+
+    test('allows moving scheduled tasks and moving other tasks above scheduled tasks via drag and drop without snapping back', () => {
+        const today = new Date().toISOString().split('T')[0];
+        const initialTasks = [
+            { id: 1, text: 'Regular Task 1', priority: 1, projectId: 'general', scheduledDate: null },
+            { id: 2, text: 'Regular Task 2', priority: 1, projectId: 'general', scheduledDate: null },
+            { id: 3, text: 'Scheduled Task Due Today', priority: 1, projectId: 'general', scheduledDate: today }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        // Upon initial load, the scheduled task should appear at the top of its priority section
+        expect(result.current.tasks.map(t => t.id)).toEqual([3, 1, 2]);
+
+        // Drag Regular Task 1 (id 1) above Scheduled Task (id 3)
+        act(() => {
+            result.current.reorderTasks(1, 3);
+        });
+
+        // The user's reordered position must be preserved!
+        expect(result.current.tasks.map(t => t.id)).toEqual([1, 3, 2]);
+
+        // Drag Scheduled Task (id 3) down onto id 2 so it drops before id 2
+        act(() => {
+            result.current.reorderTasks(2, 3);
+        });
+
+        expect(result.current.tasks.map(t => t.id)).toEqual([1, 2, 3]);
+    });
+
+    test('updates task details and handles string ID mismatch gracefully', () => {
+        const initialTasks = [
+            { id: 1, text: 'Old Task Title', priority: 1, projectId: 'general', notes: 'Old Notes' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.updateTask('1', { text: 'New Task Title', notes: 'Updated Notes', priority: 2 });
+        });
+
+        const updated = result.current.tasks.find(t => t.id === 1);
+        expect(updated.text).toBe('New Task Title');
+        expect(updated.notes).toBe('Updated Notes');
+        expect(updated.priority).toBe(2);
+        expect(updated.updatedAt).toBeDefined();
+
+        // Verify localStorage persistence
+        const saved = JSON.parse(localStorage.getItem('123TodoTasks'));
+        expect(saved[0].text).toBe('New Task Title');
+    });
+
+    test('completes task and moves it to archived array', () => {
+        const initialTasks = [
+            { id: 1, text: 'Task to Complete', priority: 1, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.completeTask(1);
+        });
+
+        expect(result.current.tasks.length).toBe(0);
+        expect(result.current.archived.length).toBe(1);
+        expect(result.current.archived[0].text).toBe('Task to Complete');
+        expect(result.current.archived[0].completedAt).toBeDefined();
+    });
+
+    test('completing a recurring task does not add to archive and advances schedule ready for next appearance', () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const recurringTask = {
+            id: 42,
+            text: 'Water office plants',
+            priority: 1,
+            projectId: 'work',
+            isRecurring: true,
+            recurrence: { frequency: 1, interval: 'days', daysOfWeek: [] },
+            scheduledDate: todayStr,
+            subtasks: [
+                { id: 'sub-1', text: 'Refill watering can', completed: true },
+                { id: 'sub-2', text: 'Water ferns', completed: true }
+            ]
+        };
+        localStorage.setItem('123TodoTasks', JSON.stringify([recurringTask]));
+
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.completeTask(42);
+        });
+
+        // Must NOT go into the Archive
+        expect(result.current.archived.length).toBe(0);
+
+        // Must remain in tasks with original ID, advancing scheduledDate into the future
+        expect(result.current.tasks.length).toBe(1);
+        const task = result.current.tasks[0];
+        expect(task.id).toBe(42);
+        expect(task.text).toBe('Water office plants');
+        expect(task.isRecurring).toBe(true);
+        expect(task.scheduledDate > todayStr).toBe(true);
+
+        // Subtask checklists must be reset to uncompleted ready for the next appearance
+        expect(task.subtasks[0].completed).toBe(false);
+        expect(task.subtasks[1].completed).toBe(false);
+    });
+
+    test('completing an overdue recurring task advances scheduledDate strictly into the future without archiving', () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const overdueTask = {
+            id: 99,
+            text: 'Weekly review',
+            priority: 2,
+            projectId: 'general',
+            isRecurring: true,
+            recurrence: { frequency: 1, interval: 'weeks', daysOfWeek: [] },
+            scheduledDate: '2020-01-01' // Past date
+        };
+        localStorage.setItem('123TodoTasks', JSON.stringify([overdueTask]));
+
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.completeTask(99);
+        });
+
+        expect(result.current.archived.length).toBe(0);
+        expect(result.current.tasks.length).toBe(1);
+        expect(result.current.tasks[0].id).toBe(99);
+        expect(result.current.tasks[0].scheduledDate > todayStr).toBe(true);
+    });
+
+    test('addNote creates task with text in Task text field, empty notes, and places it at the bottom of Priority 1 (Must Do)', () => {
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.addNote('Buy fresh organic sourdough bread', '', 'general');
+        });
+
+        const p1Tasks = result.current.tasks.filter(t => (t.priority || 1) === 1);
+        const createdTask = p1Tasks[p1Tasks.length - 1];
+        expect(createdTask.text).toBe('Buy fresh organic sourdough bread');
+        expect(createdTask.notes).toBe('');
+        expect(createdTask.priority).toBe(1); // Must Do
+    });
+
+    test('addNote appends new note to the bottom of existing Priority 1 tasks without displacing focus tasks', () => {
+        const initialTasks = [
+            { id: 101, text: 'Top Priority 1 Task', priority: 1, projectId: 'general' },
+            { id: 102, text: 'Second Priority 1 Task', priority: 1, projectId: 'general' },
+            { id: 103, text: 'Priority 2 Task', priority: 2, projectId: 'general' }
+        ];
+        localStorage.setItem('123TodoTasks', JSON.stringify(initialTasks));
+        localStorage.setItem('123TodoCounter', '103');
+
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.addNote('Newly Added Quick Note', 'Some details', 'general');
+        });
+
+        const p1Tasks = result.current.tasks.filter(t => (t.priority || 1) === 1);
+        expect(p1Tasks.length).toBe(3);
+        expect(p1Tasks[0].text).toBe('Top Priority 1 Task');
+        expect(p1Tasks[1].text).toBe('Second Priority 1 Task');
+        expect(p1Tasks[2].text).toBe('Newly Added Quick Note');
+
+        // Verify it is placed before Priority 2 tasks in the array
+        const p2Idx = result.current.tasks.findIndex(t => t.priority === 2);
+        const noteIdx = result.current.tasks.findIndex(t => t.text === 'Newly Added Quick Note');
+        expect(noteIdx).toBeLessThan(p2Idx);
+    });
+
+    test('completes task with multiple photos and persists lightweight versions without crashing quota', () => {
+        const taskWithPhotos = {
+            id: 1,
+            text: 'Task with 3 photos',
+            priority: 1,
+            projectId: 'general',
+            photos: [
+                { id: 'img_1', name: 'photo1.jpg', thumbnail: 'data:image/webp;base64,thumb1', dataUrl: 'data:image/webp;base64,verylongdataurl1' },
+                { id: 'img_2', name: 'photo2.jpg', thumbnail: 'data:image/webp;base64,thumb2', dataUrl: 'data:image/webp;base64,verylongdataurl2' },
+                { id: 'img_3', name: 'photo3.jpg', thumbnail: 'data:image/webp;base64,thumb3', dataUrl: 'data:image/webp;base64,verylongdataurl3' }
+            ]
+        };
+        localStorage.setItem('123TodoTasks', JSON.stringify([taskWithPhotos]));
+
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.completeTask(1);
+        });
+
+        expect(result.current.tasks.length).toBe(0);
+        expect(result.current.archived.length).toBe(1);
+        expect(result.current.archived[0].photos.length).toBe(3);
+
+        // Check localStorage persistence - dataUrl should be stripped to protect quota, thumbnail preserved
+        const savedArchive = JSON.parse(localStorage.getItem('123TodoArchive'));
+        expect(savedArchive[0].photos[0].thumbnail).toBe('data:image/webp;base64,thumb1');
+        expect(savedArchive[0].photos[0].dataUrl).toBeUndefined();
+    });
+
+    test('adds timed tasks in chronological order with earliest time first', () => {
+        localStorage.setItem('123TodoTasks', JSON.stringify([]));
+        const { result } = renderHook(() => useTasks());
+
+        // Add 14:00 first, then 09:30, then 11:00
+        act(() => {
+            result.current.addTask('Afternoon Call', 1, 'general', '', { scheduledDate: '2026-09-21', scheduledTime: '14:00' });
+        });
+        act(() => {
+            result.current.addTask('Morning Standup', 1, 'general', '', { scheduledDate: '2026-09-21', scheduledTime: '09:30' });
+        });
+        act(() => {
+            result.current.addTask('Midday Meeting', 1, 'general', '', { scheduledDate: '2026-09-21', scheduledTime: '11:00' });
+        });
+
+        const taskTitles = result.current.tasks.map(t => t.text);
+        expect(taskTitles).toEqual(['Morning Standup', 'Midday Meeting', 'Afternoon Call']);
+    });
+
+    test('allows manual drag and drop reordering of timed tasks and preserves the custom order', () => {
+        localStorage.setItem('123TodoTasks', JSON.stringify([]));
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.addTask('Morning Standup', 1, 'general', '', { scheduledDate: '2026-09-21', scheduledTime: '09:00' });
+        });
+        act(() => {
+            result.current.addTask('Afternoon Call', 1, 'general', '', { scheduledDate: '2026-09-21', scheduledTime: '15:00' });
+        });
+
+        const idMorning = result.current.tasks.find(t => t.text === 'Morning Standup').id;
+        const idAfternoon = result.current.tasks.find(t => t.text === 'Afternoon Call').id;
+
+        // User manually drags Afternoon Call above Morning Standup
+        act(() => {
+            result.current.reorderTasks(idAfternoon, idMorning);
+        });
+
+        // The user's manual reordering MUST be preserved!
+        const reorderedTitles = result.current.tasks.map(t => t.text);
+        expect(reorderedTitles).toEqual(['Afternoon Call', 'Morning Standup']);
+    });
+
+    test('updating task scheduledTime repositions active timed task in chronological order', () => {
+        localStorage.setItem('123TodoTasks', JSON.stringify([]));
+        const { result } = renderHook(() => useTasks());
+
+        act(() => {
+            result.current.addTask('Task A', 1, 'general', '', { scheduledDate: '2026-09-21', scheduledTime: '09:00' });
+        });
+        act(() => {
+            result.current.addTask('Task B', 1, 'general', '', { scheduledDate: '2026-09-21', scheduledTime: '14:00' });
+        });
+
+        const taskB = result.current.tasks.find(t => t.text === 'Task B');
+
+        // Update Task B's time to 08:00 (earlier than Task A)
+        act(() => {
+            result.current.updateTask(taskB.id, { scheduledTime: '08:00' });
+        });
+
+        const updatedTitles = result.current.tasks.map(t => t.text);
+        expect(updatedTitles).toEqual(['Task B', 'Task A']);
+    });
+});
+
+

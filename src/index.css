@@ -1,0 +1,293 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html {
+  font-size: 17px; /* Increases default base size to scale all text (using rem) by ~1pt */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Adaptive Typography for Compact & Older Phone Viewports */
+@media screen and (max-width: 380px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media screen and (max-width: 340px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* Hook-driven Tier Overrides (respects user settings in Settings > Appearance) */
+html[data-screen-tier="compact"] {
+  font-size: 15px;
+}
+
+html[data-screen-tier="compact-ultra"] {
+  font-size: 14px;
+}
+
+html[data-screen-tier="standard"] {
+  font-size: 17px;
+}
+
+:root {
+  --bg-color: #fafafa;
+  --text-color: #333;
+  --surface-color: #ffffff;
+  --border-color: #e5e7eb;
+  --header-bg: #ffffff;
+  --footer-bg: #f9fafb;
+  --accent-color: #285a82;
+  --muted-text: #6b7280;
+  --item-bg: #ffffff;
+  --accent-bg: #f0f7ff;
+  --archive-bg: #f9fafb;
+  
+  /* Adaptive Layout & Spacing Variables */
+  --header-logo-width: 240px;
+  --modal-padding: 18px 22px 20px 22px;
+  --task-action-btn-size: 32px;
+  --task-padding: 6px 10px;
+  --task-padding-top: 6px;
+  --task-padding-bottom: 6px;
+  --task-margin: 4px;
+  --task-font-size: 1.05rem;
+  --section-margin: 12px;
+}
+
+/* Declarative Media Query Scaling for Compact Screens */
+@media screen and (max-width: 380px) {
+  :root {
+    --header-logo-width: 190px;
+    --modal-padding: 14px 12px 16px 12px;
+    --task-action-btn-size: 30px;
+    --task-padding: 5px 8px;
+    --task-padding-top: 5px;
+    --task-padding-bottom: 5px;
+    --section-margin: 8px;
+  }
+}
+
+@media screen and (max-width: 340px) {
+  :root {
+    --header-logo-width: 165px;
+    --modal-padding: 12px 10px 14px 10px;
+    --task-action-btn-size: 28px;
+    --task-padding: 4px 6px;
+    --task-padding-top: 4px;
+    --task-padding-bottom: 4px;
+    --section-margin: 6px;
+  }
+}
+
+/* Explicit hook tier overrides */
+html[data-screen-tier="compact"] {
+  --header-logo-width: 190px;
+  --modal-padding: 14px 12px 16px 12px;
+  --task-action-btn-size: 30px;
+  --task-padding: 5px 8px;
+  --task-padding-top: 5px;
+  --task-padding-bottom: 5px;
+  --section-margin: 8px;
+}
+
+html[data-screen-tier="compact-ultra"] {
+  --header-logo-width: 165px;
+  --modal-padding: 12px 10px 14px 10px;
+  --task-action-btn-size: 28px;
+  --task-padding: 4px 6px;
+  --task-padding-top: 4px;
+  --task-padding-bottom: 4px;
+  --section-margin: 6px;
+}
+
+html[data-screen-tier="standard"] {
+  --header-logo-width: 240px;
+  --modal-padding: 18px 22px 20px 22px;
+  --task-action-btn-size: 32px;
+  --task-padding: 6px 10px;
+  --task-padding-top: 6px;
+  --task-padding-bottom: 6px;
+  --section-margin: 12px;
+}
+
+/* Enhanced contrast borders for low DPR displays (< 2.0 DPR) */
+html[data-screen-density="low-dpr"] {
+  --border-color: #d1d5db;
+}
+
+/* Configurable Light Mode Tones (applied in light mode) */
+/* 1. Bright Tone (Standard Pure White) */
+:root.light-tone-bright:not(.theme-dark) {
+  --bg-color: #ffffff;
+  --text-color: #111827;
+  --surface-color: #ffffff;
+  --border-color: #e5e7eb;
+  --header-bg: #ffffff;
+  --footer-bg: #f9fafb;
+  --accent-color: #285a82;
+  --muted-text: #6b7280;
+  --item-bg: #ffffff;
+  --accent-bg: #f0f7ff;
+  --archive-bg: #f9fafb;
+}
+
+/* 2. Soft Tone (Soft Warm Light Grey - Reduced Eye Strain) */
+:root.light-tone-soft:not(.theme-dark) {
+  --bg-color: #f1f5f9;
+  --text-color: #1e293b;
+  --surface-color: #f8fafc;
+  --border-color: #cbd5e1;
+  --header-bg: #f8fafc;
+  --footer-bg: #e2e8f0;
+  --accent-color: #1e40af;
+  --muted-text: #64748b;
+  --item-bg: #ffffff;
+  --accent-bg: #e2e8f0;
+  --archive-bg: #f1f5f9;
+}
+
+/* 3. Muted Tone (Subdued Cozy Grey - Zero Glare) */
+:root.light-tone-muted:not(.theme-dark) {
+  --bg-color: #e2e8f0;
+  --text-color: #0f172a;
+  --surface-color: #f1f5f9;
+  --border-color: #94a3b8;
+  --header-bg: #f1f5f9;
+  --footer-bg: #cbd5e1;
+  --accent-color: #1e3a8a;
+  --muted-text: #475569;
+  --item-bg: #f8fafc;
+  --accent-bg: #cbd5e1;
+  --archive-bg: #e2e8f0;
+}
+
+/* System Dark Mode: Apply unless light theme is explicitly forced */
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light) {
+    --bg-color: #111827;
+    --text-color: #f3f4f6;
+    --surface-color: #1f2937;
+    --border-color: #374151;
+    --header-bg: #1f2937;
+    --footer-bg: #111827;
+    --accent-color: #60a5fa;
+    --muted-text: #9ca3af;
+    --item-bg: #1f2937;
+    --accent-bg: #1a3245;
+    --archive-bg: #111827;
+  }
+}
+
+/* Explicit Dark Theme override */
+:root.theme-dark {
+  --bg-color: #111827;
+  --text-color: #f3f4f6;
+  --surface-color: #1f2937;
+  --border-color: #374151;
+  --header-bg: #1f2937;
+  --footer-bg: #111827;
+  --accent-color: #60a5fa;
+  --muted-text: #9ca3af;
+  --item-bg: #1f2937;
+  --accent-bg: #1a3245;
+  --archive-bg: #111827;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-color);
+  color: var(--text-color);
+  min-height: 100vh;
+  font-size: 1.1rem;
+  font-weight: 400;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+input, textarea, select {
+  font-weight: 400;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Ensure native calendar indicator matches dark mode contrast constraints */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light) input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.9) brightness(1.5);
+  }
+}
+
+:root.theme-dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.9) brightness(1.5);
+}
+
+/* Bold Font Mode Override */
+html.bold-font-active,
+html.bold-font-active body,
+html.bold-font-active input,
+html.bold-font-active textarea,
+html.bold-font-active select,
+html.bold-font-active button,
+html.bold-font-active span,
+html.bold-font-active p,
+html.bold-font-active label,
+html.bold-font-active div,
+html.bold-font-active a,
+html.bold-font-active li {
+  font-weight: 600 !important;
+}
+
+html.bold-font-active h1,
+html.bold-font-active h2,
+html.bold-font-active h3,
+html.bold-font-active h4,
+html.bold-font-active strong,
+html.bold-font-active b {
+  font-weight: 800 !important;
+}
+
+@keyframes pulseDot {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.85);
+    box-shadow: 0 0 2px #10b981;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+    box-shadow: 0 0 8px #10b981;
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(0.85);
+    box-shadow: 0 0 2px #10b981;
+  }
+}
+
+/* Compact Tasks View (Clamp task title to 2 lines) */
+.task-text-compact {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}

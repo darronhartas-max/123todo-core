@@ -1,0 +1,210 @@
+import { render, screen, act, waitFor } from '@testing-library/react';
+import App from './App';
+import { APP_VERSION } from './utils/constants';
+
+test('renders app logo', () => {
+  render(<App />);
+  const logoElement = screen.getByAltText(/123 ToDo logo/i);
+  expect(logoElement).toBeInTheDocument();
+});
+
+test('preserves user font size and bold font settings from localStorage', () => {
+  localStorage.setItem('123TodoFontSize', '16');
+  localStorage.setItem('123TodoBoldFont', 'true');
+
+  render(<App />);
+
+  expect(document.documentElement.style.fontSize).toBe('16pt');
+  expect(document.documentElement.classList.contains('bold-font-active')).toBe(true);
+});
+
+test('applies light mode background tone class to document root from localStorage', () => {
+  localStorage.setItem('123TodoLightModeTone', 'muted');
+
+  render(<App />);
+
+  expect(document.documentElement.classList.contains('light-tone-muted')).toBe(true);
+});
+
+test('defaults to muted light mode tone for new users when no localStorage setting exists', () => {
+  localStorage.removeItem('123TodoLightModeTone');
+
+  render(<App />);
+
+  expect(document.documentElement.classList.contains('light-tone-muted')).toBe(true);
+});
+
+test('defaults to 14pt font size on mobile when no localStorage setting exists', () => {
+  localStorage.removeItem('123TodoFontSize');
+  window.innerWidth = 500;
+
+  render(<App />);
+
+  expect(document.documentElement.style.fontSize).toBe('14pt');
+});
+
+test('defaults to 11pt font size on desktop when no localStorage setting exists', () => {
+  localStorage.removeItem('123TodoFontSize');
+  window.innerWidth = 1024;
+
+  render(<App />);
+
+  expect(document.documentElement.style.fontSize).toBe('11pt');
+});
+
+test('displays UpdatedModal with recent versions when clicking Latest Update Info in Settings', async () => {
+  render(<App />);
+
+  // Open settings
+  const settingsBtn = screen.getByTitle('Settings');
+  await act(async () => {
+    settingsBtn.click();
+  });
+
+  // Navigate to App & Updates tab (wait for lazy loaded SettingsModal)
+  const appTab = await screen.findByRole('button', { name: /App & Updates/i });
+  await act(async () => {
+    appTab.click();
+  });
+
+  // Click Latest Update Info button
+  const updateInfoBtn = await screen.findByRole('button', { name: /Latest Update Info/i });
+  await act(async () => {
+    updateInfoBtn.click();
+  });
+
+  expect(await screen.findByText('123 To Do Updated!')).toBeInTheDocument();
+  expect(screen.getAllByText(new RegExp(`v${APP_VERSION}`)).length).toBeGreaterThanOrEqual(1);
+  expect(screen.getAllByText(/✨ What's New in v/i).length).toBeGreaterThanOrEqual(2);
+
+  // Closing modal
+  const goBtn = await screen.findByRole('button', { name: /Awesome, Let's Go!/i });
+  await act(async () => {
+    goBtn.click();
+  });
+
+  await waitFor(() => {
+    expect(screen.queryByText('123 To Do Updated!')).not.toBeInTheDocument();
+  });
+});
+
+test('renders On Hold tasks with draggable attribute and drag support', () => {
+  const tasks = [
+    { id: 401, text: 'On Hold Task 1', priority: 4, projectId: 'general', completed: false, createdDate: '2026-09-16' },
+    { id: 402, text: 'On Hold Task 2', priority: 4, projectId: 'general', completed: false, createdDate: '2026-09-16' }
+  ];
+  localStorage.setItem('123TodoTasks', JSON.stringify(tasks));
+
+  render(<App />);
+
+  // Click on "On Hold"
+  const toggleBtn = screen.getByRole('button', { name: /On Hold \(2\)/i });
+  act(() => {
+    toggleBtn.click();
+  });
+
+  expect(screen.getByText('On Hold Task 1')).toBeInTheDocument();
+  expect(screen.getByText('On Hold Task 2')).toBeInTheDocument();
+
+  // Tasks should have draggable attributes
+  const task1 = screen.getByText('On Hold Task 1').closest('li');
+  expect(task1).toHaveAttribute('draggable', 'true');
+});
+
+test('renders On Hold and Scheduled sections without grey padding border', () => {
+  const tasks = [
+    { id: 401, text: 'On Hold Task 1', priority: 4, projectId: 'general', completed: false },
+    { id: 501, text: 'Scheduled Task 1', priority: 1, projectId: 'general', completed: false, scheduledDate: '2099-12-01' }
+  ];
+  localStorage.setItem('123TodoTasks', JSON.stringify(tasks));
+
+  render(<App />);
+
+  const onHoldBtn = screen.getByRole('button', { name: /On Hold \(1\)/i });
+  const onHoldContainer = onHoldBtn.parentElement;
+  expect(onHoldContainer).toHaveStyle({ background: 'transparent' });
+  expect(onHoldContainer).toHaveStyle({ border: '2px dashed transparent' });
+
+  const scheduledBtn = screen.getByRole('button', { name: /Scheduled & Recurring \(1\)/i });
+  const scheduledContainer = scheduledBtn.parentElement;
+  expect(scheduledContainer).toHaveStyle({ background: 'transparent' });
+  expect(scheduledContainer).toHaveStyle({ border: 'none' });
+});
+
+test('activates commercial client branding via URL query and renders branded footer', () => {
+  const originalLocation = window.location;
+  delete window.location;
+  window.location = new URL('https://www.123todo.com/?brand=pilot');
+
+  render(<App />);
+
+  expect(screen.getByText('Custom Edition prepared for Commercial Pilot')).toBeInTheDocument();
+  expect(screen.getByText('Client Support')).toBeInTheDocument();
+  expect(localStorage.getItem('123Todo_Tenant')).toBe('pilot');
+
+  window.location = originalLocation;
+});
+
+test('displays scheduled tasks in chronological order with soonest due date at the top', () => {
+  const scheduledList = [
+    { id: 501, text: 'Task due next week', priority: 1, projectId: 'general', completed: false, scheduledDate: '2099-12-01' },
+    { id: 502, text: 'Task due tomorrow', priority: 1, projectId: 'general', completed: false, scheduledDate: '2099-11-01' },
+    { id: 503, text: 'Task due mid month', priority: 1, projectId: 'general', completed: false, scheduledDate: '2099-11-15' }
+  ];
+  localStorage.setItem('123TodoTasks', JSON.stringify(scheduledList));
+
+  render(<App />);
+
+  // Expand Scheduled section
+  const toggleBtn = screen.getByRole('button', { name: /Scheduled & Recurring \(3\)/i });
+  act(() => {
+    toggleBtn.click();
+  });
+
+  const taskItems = screen.getAllByRole('listitem');
+  expect(taskItems[0]).toHaveTextContent('Task due tomorrow');
+  expect(taskItems[1]).toHaveTextContent('Task due mid month');
+  expect(taskItems[2]).toHaveTextContent('Task due next week');
+});
+
+test('lists scheduled tasks appearing on their set day at the top of their priority list', () => {
+  const today = new Date().toISOString().split('T')[0];
+  const activeList = [
+    { id: 601, text: 'Existing priority 1 regular task A', priority: 1, projectId: 'general', completed: false, scheduledDate: null },
+    { id: 602, text: 'Existing priority 1 regular task B', priority: 1, projectId: 'general', completed: false, scheduledDate: null },
+    { id: 603, text: 'Scheduled task appearing today', priority: 1, projectId: 'general', completed: false, scheduledDate: today },
+    { id: 604, text: 'Existing priority 2 regular task', priority: 2, projectId: 'general', completed: false, scheduledDate: null },
+    { id: 605, text: 'Scheduled task appearing for priority 2', priority: 2, projectId: 'general', completed: false, scheduledDate: today }
+  ];
+  localStorage.setItem('123TodoTasks', JSON.stringify(activeList));
+
+  render(<App />);
+
+  // Find all task item list elements
+  const taskElements = screen.getAllByRole('listitem');
+  
+  // In Priority 1, the scheduled task appearing today must be the very first task in the section
+  expect(taskElements[0]).toHaveTextContent('Scheduled task appearing today');
+  expect(taskElements[1]).toHaveTextContent('Existing priority 1 regular task A');
+  expect(taskElements[2]).toHaveTextContent('Existing priority 1 regular task B');
+});
+
+test('allows user to reorder scheduled tasks in priority list and move other tasks above them without snapping to top', () => {
+  const today = new Date().toISOString().split('T')[0];
+  // Once a scheduled task has appeared on its due day and been reordered, its custom position is preserved
+  const activeList = [
+    { id: 601, text: 'Regular task moved to top', priority: 1, projectId: 'general', completed: false, scheduledDate: null },
+    { id: 603, text: 'Scheduled task moved down', priority: 1, projectId: 'general', completed: false, scheduledDate: today, promotedDate: today },
+    { id: 602, text: 'Regular task at bottom', priority: 1, projectId: 'general', completed: false, scheduledDate: null }
+  ];
+  localStorage.setItem('123TodoTasks', JSON.stringify(activeList));
+
+  render(<App />);
+
+  const taskElements = screen.getAllByRole('listitem');
+  expect(taskElements[0]).toHaveTextContent('Regular task moved to top');
+  expect(taskElements[1]).toHaveTextContent('Scheduled task moved down');
+  expect(taskElements[2]).toHaveTextContent('Regular task at bottom');
+});
+
+

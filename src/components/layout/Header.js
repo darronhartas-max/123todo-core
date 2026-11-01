@@ -1,0 +1,209 @@
+import React from 'react';
+import { ListTodo, NotebookPen, Download, BookOpen } from 'lucide-react';
+import { formatDisplayDate, getTodayDateString } from '../../utils/dateUtils';
+import { DEFAULT_DATE_FORMAT } from '../../utils/constants';
+
+const Header = ({
+    isDark,
+    appMode = 'tasks',
+    onSwitchMode = () => {},
+    isStandalone = false,
+    onOpenInstall,
+    buttonDisplayMode = 'icons',
+    showGettingStarted = false,
+    onGettingStartedClick,
+    dateFormat = DEFAULT_DATE_FORMAT
+}) => {
+    const showIcons = buttonDisplayMode === 'icons' || buttonDisplayMode === 'both';
+    const showText = buttonDisplayMode === 'text' || buttonDisplayMode === 'both';
+    const todayFormatted = formatDisplayDate(getTodayDateString(), dateFormat);
+
+    const styles = {
+        header: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--header-bg)',
+            border: '1px solid var(--border-color)',
+            padding: '10px clamp(8px, 2.5vw, 16px)',
+            boxSizing: 'border-box',
+            gap: '8px',
+            width: '100%',
+            overflow: 'hidden'
+        },
+        modeToggleContainer: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            backgroundColor: 'var(--item-bg, rgba(0,0,0,0.06))',
+            borderRadius: '24px',
+            padding: '3px',
+            border: '1.5px solid var(--border-color, rgba(0,0,0,0.12))',
+            margin: 0,
+            gap: '4px',
+            flexShrink: 0,
+            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)'
+        },
+        modeButton: (active) => ({
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: showText ? '5px clamp(8px, 2vw, 14px)' : '6px 12px',
+            minWidth: showText ? 'auto' : '36px',
+            minHeight: '32px',
+            borderRadius: '20px',
+            border: 'none',
+            backgroundColor: active ? '#2563eb' : 'transparent',
+            color: active ? '#ffffff' : 'var(--text-color, #4b5563)',
+            fontWeight: '700',
+            fontSize: 'clamp(13px, 3.2vw, 15px)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap',
+            boxShadow: active ? '0 2px 6px rgba(37,99,235,0.3)' : 'none'
+        })
+    };
+
+    return (
+        <header style={styles.header}>
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                gap: '8px'
+            }}>
+                <a href="https://www.123todo.com" target="_blank" rel="noreferrer" style={{ display: 'block', flexShrink: 1, minWidth: 0, marginLeft: '-4px' }}>
+                    <img
+                        src={isDark ? '/123-logo-500px-dark.png' : '/123-logo-500px-light.png'}
+                        alt="123 ToDo logo"
+                        style={{
+                            width: 'var(--header-logo-width, 240px)',
+                            maxWidth: '100%',
+                            height: 'auto',
+                            cursor: 'pointer',
+                            display: 'block'
+                        }}
+                    />
+                </a>
+
+                {/* Right Header Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {showGettingStarted && (
+                        <a
+                            href="https://www.123todo.com/getting-started-with-123-todo"
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={onGettingStartedClick}
+                            aria-label="Getting Started Guide"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                padding: '6px clamp(8px, 1.5vw, 12px)',
+                                minHeight: '32px',
+                                borderRadius: '20px',
+                                border: '1.5px solid #2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                color: '#2563eb',
+                                fontSize: '13px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                textDecoration: 'none',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 1px 4px rgba(37, 99, 235, 0.2)'
+                            }}
+                            title="New to 123 To Do? Read our quick 3-minute beginner's guide"
+                        >
+                            <BookOpen size={14} />
+                            <span>Getting Started</span>
+                        </a>
+                    )}
+
+                    {!isStandalone && onOpenInstall && (
+                        <button
+                            onClick={onOpenInstall}
+                            aria-label="Install"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '5px',
+                                padding: showText ? '6px 12px' : '6px 10px',
+                                minWidth: showText ? 'auto' : '36px',
+                                minHeight: '32px',
+                                borderRadius: '20px',
+                                border: '1.5px solid var(--accent-color)',
+                                backgroundColor: 'var(--accent-bg, rgba(99, 102, 241, 0.1))',
+                                color: 'var(--accent-color)',
+                                fontSize: '13px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                                transition: 'all 0.2s ease'
+                            }}
+                            title="Add 123 To Do to your home screen"
+                        >
+                            {showIcons && <Download size={14} />}
+                            {showText && <span>Install</span>}
+                        </button>
+                    )}
+
+                    {/* Dual Skin Mode Switcher Toggle Pill & Today's Date */}
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        marginTop: '-3px',
+                        maxWidth: '100%'
+                    }}>
+                        <div style={styles.modeToggleContainer}>
+                            <button
+                                style={styles.modeButton(appMode === 'tasks')}
+                                onClick={() => onSwitchMode('tasks')}
+                                aria-label="Tasks"
+                                title="Switch to Task Manager Mode"
+                            >
+                                {showIcons && <ListTodo size={16} />}
+                                {showText && <span>Tasks</span>}
+                            </button>
+                            <button
+                                style={styles.modeButton(appMode === 'notes')}
+                                onClick={() => onSwitchMode('notes')}
+                                aria-label="Notes"
+                                title="Switch to Notes Mode"
+                            >
+                                {showIcons && <NotebookPen size={16} />}
+                                {showText && <span>Notes</span>}
+                            </button>
+                        </div>
+                        <span style={{
+                            fontSize: showText ? 'clamp(12.5px, 2.8vw, 13.5px)' : 'clamp(11.8px, 2.7vw, 12.6px)',
+                            fontWeight: '700',
+                            color: 'var(--muted-text)',
+                            letterSpacing: '0.2px',
+                            lineHeight: '1.2',
+                            userSelect: 'none',
+                            textAlign: 'center',
+                            maxWidth: showText ? '170px' : '90px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            boxSizing: 'border-box'
+                        }}>
+                            {todayFormatted}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </header>
+    );
+};
+
+export default React.memo(Header);

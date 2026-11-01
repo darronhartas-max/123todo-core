@@ -1,0 +1,1487 @@
+import React, { useState } from 'react';
+import { Trash2, RotateCcw, Square, CheckSquare, Calendar, Repeat, Flag, PauseCircle, Edit2, Slash, FileText, GripVertical, Camera, FastForward, Clock, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SWIPE_ACTIONS } from '../../utils/constants';
+import { formatDisplayDate, formatDisplayTime, getTomorrowDateString, getNextWeekDateString } from '../../utils/dateUtils';
+import PhotoAttachments from '../notes/PhotoAttachments';
+import { renderActionableText } from '../../utils/textUtils';
+import { reorderList, toggleSubtaskStatus } from '../../utils/reorderUtils';
+import { useSubtaskReorder } from '../../hooks/useSubtaskReorder';
+
+const ACTION_ICONS = {
+    CheckSquare,
+    Trash2,
+    Flag,
+    PauseCircle,
+    Edit2,
+    Slash
+};
+
+const TaskItem = ({
+    task,
+    isArchived,
+    onComplete,
+    onDelete,
+    onRestore,
+    onEdit,
+    onUpdate,
+    dragHandlers,
+    onDragStart,
+    onDragOver,
+    onDrop,
+    onDragEnd,
+    projectColor,
+    projectName,
+    isDragging,
+    isDragOver,
+    showFullDetails,
+    swipeSettings,
+    onSwipeAction,
+    dateFormat = 'UK',
+    taskViewMode = 'compact',
+    viewProfile = 'pro',
+    timeSchedulingEnabled = true
+}) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const [isChecked, setIsChecked] = useState(false);
+    const [showQuickSchedule, setShowQuickSchedule] = useState(false);
+    const [showNotesExpanded, setShowNotesExpanded] = useState(false);
+    const [showSubtasksExpanded, setShowSubtasksExpanded] = useState(false);
+    const {
+        draggedSubtaskIndex,
+        dragOverSubtaskInfo,
+        handleSubtaskTouchStart,
+        setDraggedSubtaskIndex,
+        setDragOverSubtaskInfo
+    } = useSubtaskReorder(task.subtasks, (reordered) => {
+        if (onUpdate) onUpdate(task.id, { subtasks: reordered });
+    });
+    const archiveTimeoutRef = React.useRef(null);
+
+    // Swipe Gesture State & Visual Damping
+    const [swipeOffset, setSwipeOffset] = useState(0);
+    const touchStartRef = React.useRef({ x: 0, y: 0 });
+    const isSwipingRef = React.useRef(false);
+    const wasSwipingRef = React.useRef(false);
+    const wasDraggingRef = React.useRef(false);
+    const isScrollingVerticalRef = React.useRef(false);
+
+    const THRESHOLD = 95;
+
+    const applyDamping = (diffX) => {
+        const absX = Math.abs(diffX);
+        if (absX <= THRESHOLD) return diffX;
+        const over = absX - THRESHOLD;
+        const dampedOver = over * 0.45;
+        return Math.sign(diffX) * (THRESHOLD + dampedOver);
+    };
+
+    const handleStart = (clientX, clientY) => {
+        if (!swipeSettings?.enabled || isArchived) return;
+        touchStartRef.current = { x: clientX, y: clientY };
+        isSwipingRef.current = false;
+        wasSwipingRef.current = false;
+        isScrollingVerticalRef.current = false;
+    };
+
+    const handleMove = (clientX, clientY, e) => {
+        if (!swipeSettings?.enabled || isArchived || isScrollingVerticalRef.current) return;
+        const diffX = clientX - touchStartRef.current.x;
+        const diffY = clientY - touchStartRef.current.y;
+        const absX = Math.abs(diffX);
+        const absY = Math.abs(diffY);
+
+        // If swiping has not started yet, determine user intent (horizontal swipe vs vertical page scroll)
+        if (!isSwipingRef.current) {
+            // Immediate vertical scroll intent: any noticeable vertical movement locks into vertical scroll
+            if (absY > 7 && (absY * 1.15 >= absX || absY > 12)) {
+                isScrollingVerticalRef.current = true;
+                setSwipeOffset(0);
+                return;
+            }
+
+            // Horizontal swipe intent: engage ONLY when horizontal movement is deliberate (>= 16px) and clearly exceeds vertical movement by 2x
+            if (absX >= 16 && absX > absY * 2.0) {
+                isSwipingRef.current = true;
+                wasSwipingRef.current = true;
+            } else {
+                // Not enough horizontal intent yet, do not intercept or prevent native scroll
+                return;
+            }
+        }
+
+        // Once horizontal swiping is engaged, track smoothly and prevent default vertical scrolling
+        if (isSwipingRef.current) {
+            if (e && e.cancelable) e.preventDefault();
+            const rawOffset = applyDamping(diffX);
+            const clampedOffset = Math.max(-260, Math.min(260, rawOffset));
+            setSwipeOffset(clampedOffset);
+        }
+    };
+
+    const handleEnd = () => {
+        if (!swipeSettings?.enabled || !isSwipingRef.current || isScrollingVerticalRef.current) {
+            setSwipeOffset(0);
+            isSwipingRef.current = false;
+            isScrollingVerticalRef.current = false;
+            setTimeout(() => { wasSwipingRef.current = false; }, 120);
+            return;
+        }
+
+        if (swipeOffset >= THRESHOLD && swipeSettings.swipeRight && swipeSettings.swipeRight !== 'none') {
+            onSwipeAction && onSwipeAction(task, swipeSettings.swipeRight);
+        } else if (swipeOffset <= -THRESHOLD && swipeSettings.swipeLeft && swipeSettings.swipeLeft !== 'none') {
+            onSwipeAction && onSwipeAction(task, swipeSettings.swipeLeft);
+        }
+        setSwipeOffset(0);
+        isSwipingRef.current = false;
+        isScrollingVerticalRef.current = false;
+        setTimeout(() => { wasSwipingRef.current = false; }, 120);
+    };
+
+    const handleTouchStart = (e) => {
+        const touch = e.touches[0];
+        handleStart(touch.clientX, touch.clientY);
+    };
+
+    const handleTouchMove = (e) => {
+        const touch = e.touches[0];
+        handleMove(touch.clientX, touch.clientY, e);
+    };
+
+    const handleTouchEnd = () => {
+        handleEnd();
+    };
+
+    const handleCancel = () => {
+        setSwipeOffset(0);
+        isSwipingRef.current = false;
+        wasSwipingRef.current = false;
+        isScrollingVerticalRef.current = false;
+        touchStartRef.current = { x: 0, y: 0 };
+    };
+
+    const handlePointerDown = (e) => {
+        if (e.pointerType === 'mouse' || e.pointerType === 'touch') return;
+        handleStart(e.clientX, e.clientY);
+    };
+
+    const handlePointerMove = (e) => {
+        if (e.pointerType === 'mouse' || e.pointerType === 'touch') return;
+        if (touchStartRef.current.x === 0 && touchStartRef.current.y === 0) return;
+        handleMove(e.clientX, e.clientY, e);
+    };
+
+    const handlePointerUp = (e) => {
+        if (e.pointerType === 'mouse' || e.pointerType === 'touch') return;
+        handleEnd();
+        touchStartRef.current = { x: 0, y: 0 };
+    };
+
+    const onCompleteRef = React.useRef(onComplete);
+    const lastCompleteTimeRef = React.useRef(0);
+    const isCompletingRef = React.useRef(false);
+
+    React.useEffect(() => {
+        onCompleteRef.current = onComplete;
+    }, [onComplete]);
+
+    // Reset local checked state whenever task ID or archive status changes
+    React.useEffect(() => {
+        setIsChecked(false);
+        isCompletingRef.current = false;
+        if (archiveTimeoutRef.current) {
+            clearTimeout(archiveTimeoutRef.current);
+            archiveTimeoutRef.current = null;
+        }
+    }, [task.id, isArchived]);
+
+    const handleComplete = (e) => {
+        if (e) {
+            if (e.stopPropagation) e.stopPropagation();
+            if (e.preventDefault && e.cancelable) e.preventDefault();
+        }
+        
+        // Only block if this task row is actively in the middle of a horizontal swipe gesture
+        if (isSwipingRef.current || Math.abs(swipeOffset) > 10) return;
+
+        // Prevent double trigger / mid-flight cancellation
+        if (isCompletingRef.current) return;
+
+        const now = Date.now();
+        if (now - lastCompleteTimeRef.current < 250) return;
+        lastCompleteTimeRef.current = now;
+
+        isCompletingRef.current = true;
+        setIsChecked(true);
+
+        if (archiveTimeoutRef.current) {
+            clearTimeout(archiveTimeoutRef.current);
+        }
+
+        archiveTimeoutRef.current = setTimeout(() => {
+            archiveTimeoutRef.current = null;
+            setIsChecked(false);
+            isCompletingRef.current = false;
+            if (onCompleteRef.current) {
+                onCompleteRef.current(task.id);
+            }
+        }, 300);
+    };
+
+    React.useEffect(() => {
+        return () => {
+            if (archiveTimeoutRef.current) {
+                clearTimeout(archiveTimeoutRef.current);
+                archiveTimeoutRef.current = null;
+                setIsChecked(false);
+                isCompletingRef.current = false;
+                if (onCompleteRef.current) {
+                    onCompleteRef.current(task.id);
+                }
+            }
+        };
+    }, [task.id]);
+
+
+
+    const getRecurrenceText = (rec) => {
+        if (!rec) return '';
+        const { frequency = 1, interval = 'days', daysOfWeek = [] } = rec;
+        const intervalLabel = frequency === 1 
+            ? (interval === 'days' ? 'day' : interval === 'weeks' ? 'week' : interval === 'months' ? 'month' : 'year')
+            : (interval === 'days' ? 'days' : interval === 'weeks' ? 'weeks' : interval === 'months' ? 'months' : 'years');
+            
+        const freqText = frequency === 1 ? 'Every' : `Every ${frequency}`;
+        
+        if (interval === 'weeks' && daysOfWeek && daysOfWeek.length > 0) {
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const selectedDays = daysOfWeek.map(d => dayNames[d]).join(', ');
+            return `${freqText} week on ${selectedDays}`;
+        }
+        
+        return `${freqText} ${intervalLabel}`;
+    };
+
+    const subtasksCount = (task.subtasks || []).length;
+    const completedCount = (task.subtasks || []).filter(s => s.completed).length;
+
+    const isLite = viewProfile === 'lite';
+    const effectiveShowFull = showFullDetails;
+    const hasExtraDetails = !isLite && Boolean(
+        (showFullDetails && ((task.scheduledDate && !isArchived) || task.isRecurring || (task.deferCount > 0 && !task.deferAlertDismissed))) ||
+        showQuickSchedule ||
+        subtasksCount > 0 ||
+        (showFullDetails && (task.notes || (task.photos && task.photos.length > 0)))
+    );
+
+    const styles = {
+        taskItem: {
+            display: 'flex',
+            width: '100%',
+            boxSizing: 'border-box',
+            padding: 'var(--task-padding, 6px 10px)',
+            borderTop: isDragging ? '1px solid var(--accent-color)' : '1px solid transparent',
+            borderRight: isDragging ? '1px solid var(--accent-color)' : '1px solid transparent',
+            borderBottom: isDragging ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
+            borderLeft: projectColor ? `6px solid ${projectColor}` : (task.isSample ? '6px solid #0ea5e9' : (isDragging ? '1px solid var(--accent-color)' : 'none')),
+            background: task.isSample ? 'rgba(14, 165, 233, 0.1)' : 'var(--item-bg)',
+            cursor: isArchived ? (onEdit ? 'pointer' : 'default') : 'move',
+            borderRadius: '6px',
+            marginBottom: 'var(--task-margin, 4px)',
+            transition: 'background 0.2s ease, border-color 0.2s ease, opacity 0.15s ease',
+            position: 'relative',
+            alignItems: hasExtraDetails ? 'flex-start' : 'center',
+            paddingTop: 'var(--task-padding-top, 6px)',
+            paddingBottom: 'var(--task-padding-bottom, 6px)',
+            opacity: isDragging ? 0.35 : 1,
+            boxShadow: isDragging ? 'none' : 'none'
+        },
+        taskText: {
+            flex: 1,
+            border: 'none',
+            background: 'transparent',
+            fontSize: 'var(--task-font-size, 1.05rem)',
+            color: 'var(--text-color)',
+            cursor: isArchived ? (onEdit ? 'pointer' : 'default') : 'pointer',
+            fontFamily: 'Inter, sans-serif',
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
+            whiteSpace: 'normal',
+            textAlign: 'left',
+            fontWeight: '400',
+            lineHeight: '1.35',
+            margin: 0,
+            minWidth: 0,
+            ...(isArchived || taskViewMode === 'compact' ? {
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+            } : {})
+        },
+        actionBtn: {
+            background: 'transparent',
+            border: 'none',
+            fontSize: '1.1rem',
+            cursor: 'pointer',
+            marginLeft: '2px',
+            borderRadius: '50%',
+            padding: '2px',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '26px',
+            height: '26px',
+            flexShrink: 0
+        }
+    };
+
+
+
+    const rightSwipeAction = swipeSettings?.enabled && swipeSettings?.swipeRight ? SWIPE_ACTIONS[swipeSettings.swipeRight] : null;
+    const leftSwipeAction = swipeSettings?.enabled && swipeSettings?.swipeLeft ? SWIPE_ACTIONS[swipeSettings.swipeLeft] : null;
+
+    const RightIcon = rightSwipeAction ? ACTION_ICONS[rightSwipeAction.icon] || CheckSquare : null;
+    const LeftIcon = leftSwipeAction ? ACTION_ICONS[leftSwipeAction.icon] || Trash2 : null;
+
+    const isRightArmed = swipeOffset >= THRESHOLD && swipeSettings?.swipeRight !== 'none';
+    const isLeftArmed = Math.abs(swipeOffset) >= THRESHOLD && swipeOffset < 0 && swipeSettings?.swipeLeft !== 'none';
+    const rightProgress = Math.min(1, Math.max(0, swipeOffset / THRESHOLD));
+    const leftProgress = Math.min(1, Math.max(0, Math.abs(swipeOffset) / THRESHOLD));
+
+    // Haptic vibration feedback on threshold crossing
+    const prevArmedRef = React.useRef(false);
+    React.useEffect(() => {
+        const armed = isRightArmed || isLeftArmed;
+        if (armed && !prevArmedRef.current) {
+            if (navigator.vibrate) {
+                try { navigator.vibrate(12); } catch {}
+            }
+        }
+        prevArmedRef.current = armed;
+    }, [isRightArmed, isLeftArmed]);
+
+    return (
+        <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '6px', marginBottom: 'var(--task-margin, 4px)' }}>
+            {/* Background Swipe Reveal Layer - Right Swipe (Left Side) */}
+            {swipeOffset > 0 && rightSwipeAction && swipeSettings?.swipeRight !== 'none' && (
+                <div style={{
+                    position: 'absolute',
+                    top: 0, bottom: 0, left: 0, right: 0,
+                    background: isRightArmed 
+                        ? (rightSwipeAction.activeBg || rightSwipeAction.color) 
+                        : `linear-gradient(90deg, ${rightSwipeAction.color}e6 0%, ${rightSwipeAction.color}b3 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    paddingLeft: `${Math.max(8, Math.min(16, swipeOffset * 0.2))}px`,
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    fontWeight: isRightArmed ? '800' : '700',
+                    fontSize: '0.88rem',
+                    gap: '6px',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                    transition: 'background 0.15s ease',
+                    boxShadow: isRightArmed ? `inset 0 0 24px rgba(0,0,0,0.2)` : 'none'
+                }}>
+                    <motion.div
+                        animate={{
+                            scale: isRightArmed ? 1.25 : (0.85 + rightProgress * 0.25),
+                            rotate: isRightArmed ? [0, -10, 0] : 0
+                        }}
+                        transition={{ type: "spring", stiffness: 550, damping: 18 }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '50%',
+                            background: isRightArmed ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.2)',
+                            boxShadow: isRightArmed ? '0 0 14px rgba(255, 255, 255, 0.6)' : 'none',
+                            flexShrink: 0
+                        }}
+                    >
+                        {RightIcon && <RightIcon size={18} color="#ffffff" />}
+                    </motion.div>
+                    <motion.span
+                        animate={{
+                            opacity: Math.min(1, Math.abs(swipeOffset) / 10),
+                            x: isRightArmed ? 4 : 0,
+                            scale: isRightArmed ? 1.05 : 1
+                        }}
+                        transition={{ duration: 0.12 }}
+                        style={{
+                            color: '#ffffff',
+                            letterSpacing: '0.02em',
+                            textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                            fontWeight: '700',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {rightSwipeAction.actionHint || rightSwipeAction.label}
+                    </motion.span>
+
+                    {/* Threshold Snap Notch Marker line */}
+                    {!isRightArmed && (
+                        <div style={{
+                            position: 'absolute',
+                            left: `${THRESHOLD}px`,
+                            top: '15%',
+                            bottom: '15%',
+                            width: '3px',
+                            background: '#ffffff',
+                            opacity: 0.65,
+                            borderRadius: '1.5px',
+                            boxShadow: '0 0 6px rgba(255, 255, 255, 0.8)'
+                        }} />
+                    )}
+                </div>
+            )}
+
+            {/* Background Swipe Reveal Layer - Left Swipe (Right Side) */}
+            {swipeOffset < 0 && leftSwipeAction && swipeSettings?.swipeLeft !== 'none' && (
+                <div style={{
+                    position: 'absolute',
+                    top: 0, bottom: 0, left: 0, right: 0,
+                    background: isLeftArmed 
+                        ? (leftSwipeAction.activeBg || `linear-gradient(270deg, ${leftSwipeAction.color} 0%, ${leftSwipeAction.color}ee 100%)`)
+                        : `linear-gradient(270deg, ${leftSwipeAction.color}d9 0%, ${leftSwipeAction.color}80 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    paddingRight: `${Math.max(10, Math.min(24, Math.abs(swipeOffset) * 0.18))}px`,
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    fontWeight: isLeftArmed ? '800' : '700',
+                    fontSize: '0.88rem',
+                    gap: '8px',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                    transition: 'background 0.2s ease, box-shadow 0.2s ease',
+                    boxShadow: isLeftArmed ? `inset 0 0 28px rgba(0,0,0,0.3)` : 'none'
+                }}>
+                    <motion.span
+                        animate={{
+                            opacity: Math.min(1, Math.abs(swipeOffset) / 12),
+                            x: isLeftArmed ? -4 : 0,
+                            scale: isLeftArmed ? 1.08 : 1
+                        }}
+                        transition={{ duration: 0.12 }}
+                        style={{
+                            color: '#ffffff',
+                            letterSpacing: '0.02em',
+                            textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                            fontWeight: isLeftArmed ? '800' : '700',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {isLeftArmed ? `Release to ${leftSwipeAction.label}` : (leftSwipeAction.actionHint || leftSwipeAction.label)}
+                    </motion.span>
+                    <motion.div
+                        animate={{
+                            scale: isLeftArmed ? 1.35 : (0.85 + leftProgress * 0.3),
+                            rotate: isLeftArmed ? [0, 8, 0] : 0
+                        }}
+                        transition={{ type: "spring", stiffness: 550, damping: 16 }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: isLeftArmed ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.22)',
+                            boxShadow: isLeftArmed ? '0 0 16px rgba(255, 255, 255, 0.7)' : 'none',
+                            flexShrink: 0
+                        }}
+                    >
+                        {LeftIcon && <LeftIcon size={19} color="#ffffff" />}
+                    </motion.div>
+
+                    {/* Threshold Snap Notch Marker line */}
+                    {!isLeftArmed && (
+                        <div style={{
+                            position: 'absolute',
+                            right: `${THRESHOLD}px`,
+                            top: '15%',
+                            bottom: '15%',
+                            width: '3px',
+                            background: '#ffffff',
+                            opacity: 0.75,
+                            borderRadius: '1.5px',
+                            boxShadow: '0 0 6px rgba(255, 255, 255, 0.8)'
+                        }} />
+                    )}
+                </div>
+            )}
+
+            <motion.li
+                layout={false}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0, x: swipeOffset }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{
+                    x: swipeOffset !== 0 ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 30 },
+                    opacity: { duration: 0.15 },
+                    y: { duration: 0.15 },
+                    layout: { duration: 0.2 }
+                }}
+                style={{
+                    ...styles.taskItem,
+                    marginBottom: 0,
+                    touchAction: 'pan-y',
+                    userSelect: swipeOffset !== 0 ? 'none' : 'auto',
+                    WebkitUserSelect: swipeOffset !== 0 ? 'none' : 'auto',
+                    position: 'relative',
+                    zIndex: 2
+                }}
+                draggable={!isArchived}
+                {...((!isArchived && (onDragStart || dragHandlers)) ? {
+                    onDragStart: (e) => {
+                        if (isSwipingRef.current || Math.abs(swipeOffset) > 5) {
+                            e.preventDefault();
+                            return;
+                        }
+                        wasDraggingRef.current = true;
+                        if (onDragStart) {
+                            onDragStart(e, task.id);
+                        } else if (dragHandlers?.onDragStart) {
+                            dragHandlers.onDragStart(e);
+                        }
+                    },
+                    onDragOver: (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+                        if (onDragOver) {
+                            onDragOver(e, task.id);
+                        } else if (dragHandlers?.onDragOver) {
+                            dragHandlers.onDragOver(e);
+                        }
+                    },
+                    onDrop: (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onDrop) {
+                            onDrop(e, task.id);
+                        } else if (dragHandlers?.onDrop) {
+                            dragHandlers.onDrop(e);
+                        }
+                    },
+                    onDragEnd: (e) => {
+                        if (onDragEnd) {
+                            onDragEnd(e, task.id);
+                        } else if (dragHandlers?.onDragEnd) {
+                            dragHandlers.onDragEnd(e);
+                        }
+                        setTimeout(() => {
+                            wasDraggingRef.current = false;
+                        }, 150);
+                    }
+                } : {})}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleCancel}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handleCancel}
+                onClick={(e) => {
+                    if (wasDraggingRef.current || wasSwipingRef.current || isSwipingRef.current || Math.abs(swipeOffset) > 5) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        return;
+                    }
+                    if (onEdit) onEdit(task);
+                }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+            >
+            {isDragOver && (
+                <div style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    left: '8px',
+                    right: '8px',
+                    height: '3px',
+                    background: 'var(--accent-color)',
+                    borderRadius: '1.5px',
+                    boxShadow: '0 0 8px var(--accent-color)',
+                    zIndex: 100,
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center'
+                }}>
+                    <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: 'var(--accent-color)',
+                        marginLeft: '-4px',
+                        boxShadow: '0 0 6px var(--accent-color)'
+                    }} />
+                </div>
+            )}
+            {isArchived && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerMove={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    style={{
+                        ...styles.actionBtn,
+                        color: '#ef4444',
+                        marginLeft: '0',
+                        marginRight: '8px',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        width: 'var(--task-action-btn-size, 32px)',
+                        height: 'var(--task-action-btn-size, 32px)',
+                        minWidth: 'var(--task-action-btn-size, 32px)',
+                        marginTop: '2px',
+                        flexShrink: 0
+                    }}
+                    title="Permanently Delete Task"
+                >
+                    <Trash2 size={18} />
+                </button>
+            )}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                {isLite ? (
+                    <div style={{ minWidth: 0, width: '100%' }}>
+                        <span 
+                            style={{
+                                ...styles.taskText,
+                                fontSize: '0.92rem',
+                                fontWeight: '500',
+                                lineHeight: '1.35',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                wordBreak: 'break-word',
+                                whiteSpace: 'normal',
+                                minWidth: 0
+                            }}
+                            title={task.text}
+                        >
+                            {timeSchedulingEnabled && task.scheduledTime && (
+                                <span
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: '700',
+                                        color: isArchived ? 'var(--muted-text)' : 'var(--accent-color, #2563eb)',
+                                        background: isArchived ? 'transparent' : 'var(--accent-bg, rgba(37, 99, 235, 0.08))',
+                                        border: `1px solid ${isArchived ? 'var(--border-color)' : 'rgba(37, 99, 235, 0.22)'}`,
+                                        padding: '1px 5px',
+                                        borderRadius: '4px',
+                                        flexShrink: 0,
+                                        lineHeight: '14px',
+                                        letterSpacing: '0.2px',
+                                        marginRight: '6px',
+                                        verticalAlign: 'middle',
+                                        marginTop: '-2px',
+                                        opacity: isArchived ? 0.6 : 1
+                                    }}
+                                    title={`Scheduled time: ${formatDisplayTime(task.scheduledTime, dateFormat)}`}
+                                >
+                                    <Clock size={10} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                                    <span>{formatDisplayTime(task.scheduledTime, dateFormat)}</span>
+                                </span>
+                            )}
+                            {renderActionableText(task.text)}
+                        </span>
+                    </div>
+                ) : (
+                    <>
+                        {projectName && (
+                            <div style={{
+                                color: projectColor || 'var(--accent-color)',
+                                fontWeight: '700',
+                                fontSize: '0.78rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                marginBottom: '2px'
+                            }}>
+                                ● {projectName}
+                            </div>
+                        )}
+                        <div style={{ minWidth: 0, width: '100%' }}>
+                            <span 
+                                className={taskViewMode === 'compact' ? 'task-text-compact' : ''}
+                                style={styles.taskText}
+                                title={taskViewMode === 'compact' ? task.text : undefined}
+                            >
+                                {timeSchedulingEnabled && task.scheduledTime && (
+                                    <span
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: '700',
+                                            color: isArchived ? 'var(--muted-text)' : 'var(--accent-color, #2563eb)',
+                                            background: isArchived ? 'transparent' : 'var(--accent-bg, rgba(37, 99, 235, 0.08))',
+                                            border: `1px solid ${isArchived ? 'var(--border-color)' : 'rgba(37, 99, 235, 0.22)'}`,
+                                            padding: '1px 5px',
+                                            borderRadius: '4px',
+                                            flexShrink: 0,
+                                            lineHeight: '14px',
+                                            letterSpacing: '0.2px',
+                                            marginRight: '6px',
+                                            verticalAlign: 'middle',
+                                            marginTop: '-2px',
+                                            opacity: isArchived ? 0.6 : 1
+                                        }}
+                                        title={`Scheduled time: ${formatDisplayTime(task.scheduledTime, dateFormat)}`}
+                                    >
+                                        <Clock size={10} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                                        <span>{formatDisplayTime(task.scheduledTime, dateFormat)}</span>
+                                    </span>
+                                )}
+                                {renderActionableText(task.text)}
+                                {task.photos && task.photos.length > 0 && (
+                                    <span
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowNotesExpanded(prev => !prev);
+                                        }}
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            fontSize: '0.70rem',
+                                            color: '#0284c7',
+                                            background: 'rgba(2, 132, 199, 0.08)',
+                                            border: '1px solid rgba(2, 132, 199, 0.28)',
+                                            padding: '1px 5px',
+                                            borderRadius: '4px',
+                                            fontWeight: '700',
+                                            flexShrink: 0,
+                                            cursor: 'pointer',
+                                            lineHeight: '14px',
+                                            marginLeft: '6px',
+                                            verticalAlign: 'middle',
+                                            marginTop: '-2px'
+                                        }}
+                                        title={`${task.photos.length} photo${task.photos.length > 1 ? 's' : ''} attached (click to view)`}
+                                    >
+                                        <Camera size={11} strokeWidth={2.2} />
+                                        {task.photos.length}
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+
+                        {/* Compact Note Preview: first line only in smaller font, space-efficient */}
+                        {!isArchived && (() => {
+                            const firstNoteLine = task.notes ? task.notes.trim().split('\n')[0].trim() : '';
+                            if (!firstNoteLine) return null;
+                            return (
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '0.78rem',
+                                        color: 'var(--muted-text)',
+                                        marginTop: '2px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '100%',
+                                        lineHeight: '1.25',
+                                        opacity: 0.85,
+                                        minWidth: 0
+                                    }}
+                                    title={firstNoteLine}
+                                >
+                                    <FileText size={11} style={{ flexShrink: 0, opacity: 0.7 }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                                        {renderActionableText(firstNoteLine)}
+                                    </span>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Scheduled / Recurrence details */}
+                        {effectiveShowFull && ((task.scheduledDate && !isArchived) || task.isRecurring || (task.deferCount > 0 && !task.deferAlertDismissed)) && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '0.8rem',
+                                color: 'var(--muted-text)',
+                        marginTop: '4px',
+                        flexWrap: 'wrap'
+                    }}>
+                        {task.scheduledDate && !isArchived && (
+                            <span style={{
+                                background: task.isRecurring ? 'rgba(16, 185, 129, 0.08)' : 'rgba(37, 99, 235, 0.08)',
+                                color: task.isRecurring ? '#10b981' : 'var(--accent-color)',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: '600',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                            }}>
+                                {task.isRecurring ? <Repeat size={12} /> : <Calendar size={12} />}
+                                <span>
+                                    {formatDisplayDate(task.scheduledDate, dateFormat)}
+                                    {timeSchedulingEnabled && task.scheduledTime ? ` • ${formatDisplayTime(task.scheduledTime, dateFormat)}` : ''}
+                                </span>
+                            </span>
+                        )}
+                        {task.isRecurring && task.recurrence && (
+                            <span style={{
+                                background: 'rgba(16, 185, 129, 0.08)',
+                                color: '#10b981',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: '600',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                            }}>
+                                <Repeat size={12} /> {getRecurrenceText(task.recurrence)}
+                            </span>
+                        )}
+                        {task.deferCount > 0 && !task.deferAlertDismissed && !isArchived && (
+                            <span style={{
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                color: '#ef4444',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: '600',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }} title={`This task has been deferred ${task.deferCount} times`}>
+                                <span>⚠️ Deferred {task.deferCount}x</span>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (onUpdate) onUpdate(task.id, { deferAlertDismissed: true });
+                                    }}
+                                    title="Remove notice for good"
+                                    aria-label="Remove deferred notice"
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: '#ef4444',
+                                        padding: '0 2px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        lineHeight: 1,
+                                        opacity: 0.7
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                                >
+                                    <X size={11} strokeWidth={2.5} />
+                                </button>
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Quick Defer Inline Calendar */}
+                {showQuickSchedule && (
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            marginTop: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'var(--surface-color)',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-color)',
+                            width: 'fit-content',
+                            maxWidth: '100%',
+                            flexWrap: 'wrap',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                        }}
+                    >
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--muted-text)' }}>Defer:</span>
+                        <input
+                            type="date"
+                            value={task.scheduledDate || ''}
+                            onChange={(e) => {
+                                const newDate = e.target.value || null;
+                                onUpdate(task.id, { scheduledDate: newDate });
+                                setShowQuickSchedule(false);
+                            }}
+                            style={{
+                                padding: '3px 6px',
+                                fontSize: '0.85rem',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '4px',
+                                background: 'var(--item-bg)',
+                                color: 'var(--text-color)',
+                                outline: 'none'
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onUpdate(task.id, { scheduledDate: getTomorrowDateString() });
+                                setShowQuickSchedule(false);
+                            }}
+                            style={{
+                                border: '1px solid var(--accent-color)',
+                                background: 'var(--accent-bg)',
+                                color: 'var(--accent-color)',
+                                cursor: 'pointer',
+                                fontSize: '0.78rem',
+                                fontWeight: '600',
+                                padding: '4px 7px',
+                                borderRadius: '4px',
+                                whiteSpace: 'nowrap',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                            title="Defer task to tomorrow (Next Day)"
+                        >
+                            <FastForward size={12} style={{ flexShrink: 0 }} />
+                            <span>Day</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onUpdate(task.id, { scheduledDate: getNextWeekDateString() });
+                                setShowQuickSchedule(false);
+                            }}
+                            style={{
+                                border: '1px solid var(--accent-color)',
+                                background: 'var(--accent-bg)',
+                                color: 'var(--accent-color)',
+                                cursor: 'pointer',
+                                fontSize: '0.78rem',
+                                fontWeight: '600',
+                                padding: '4px 7px',
+                                borderRadius: '4px',
+                                whiteSpace: 'nowrap',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                            title="Defer task to Monday of next week"
+                        >
+                            <FastForward size={12} style={{ flexShrink: 0 }} />
+                            <span>Week</span>
+                        </button>
+                        <button
+                            onClick={() => setShowQuickSchedule(false)}
+                            style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontWeight: '600',
+                                marginLeft: '4px'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
+
+                {/* Subtask indicator and checklist */}
+                {subtasksCount > 0 && !isArchived && (
+                    <div style={{ marginTop: '8px', width: '100%', paddingRight: '8px', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setShowSubtasksExpanded(!showSubtasksExpanded); }}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600',
+                                    color: 'var(--muted-text)',
+                                    padding: 0
+                                }}
+                            >
+                                📋 Steps: {completedCount}/{subtasksCount} ({showSubtasksExpanded ? '▾' : '▸'})
+                            </button>
+                            <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--accent-color)' }}>
+                                {Math.round((completedCount / subtasksCount) * 100)}%
+                            </span>
+                        </div>
+                        <div style={{
+                            width: '100%',
+                            height: '4px',
+                            background: 'var(--border-color)',
+                            borderRadius: '2px',
+                            overflow: 'hidden',
+                            marginBottom: '6px'
+                        }}>
+                            <div style={{
+                                width: `${(completedCount / subtasksCount) * 100}%`,
+                                height: '100%',
+                                background: 'var(--accent-color)',
+                                transition: 'width 0.3s ease'
+                            }} />
+                        </div>
+                        {showSubtasksExpanded && (
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '6px 0 0 0' }}>
+                                {(task.subtasks || []).map((st, index) => {
+                                    const isDraggingThis = draggedSubtaskIndex === index;
+                                    const isTargetThis = dragOverSubtaskInfo?.index === index;
+                                    const targetPosition = dragOverSubtaskInfo?.position;
+
+                                    const showTopIndicator = isTargetThis && targetPosition === 'before' && (
+                                        draggedSubtaskIndex !== index && draggedSubtaskIndex !== index - 1
+                                    );
+                                    const showBottomIndicator = isTargetThis && targetPosition === 'after' && (
+                                        draggedSubtaskIndex !== index && draggedSubtaskIndex !== index + 1
+                                    );
+
+                                    return (
+                                        <li
+                                            key={st.id}
+                                            data-subtask-index={index}
+                                            draggable={true}
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData('text/plain', String(index));
+                                                e.dataTransfer.effectAllowed = 'move';
+                                                setDraggedSubtaskIndex(index);
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const pos = e.clientY < (rect.top + rect.height / 2) ? 'before' : 'after';
+                                                if (!dragOverSubtaskInfo || dragOverSubtaskInfo.index !== index || dragOverSubtaskInfo.position !== pos) {
+                                                    setDragOverSubtaskInfo({ index, position: pos });
+                                                }
+                                            }}
+                                            onDragLeave={(e) => {
+                                                if (!e.currentTarget.contains(e.relatedTarget)) {
+                                                    setDragOverSubtaskInfo(prev => prev?.index === index ? null : prev);
+                                                }
+                                            }}
+                                            onDragEnd={() => {
+                                                setDraggedSubtaskIndex(null);
+                                                setDragOverSubtaskInfo(null);
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const fromIndex = draggedSubtaskIndex ?? parseInt(e.dataTransfer.getData('text/plain'), 10);
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const pos = dragOverSubtaskInfo?.position || (e.clientY < (rect.top + rect.height / 2) ? 'before' : 'after');
+                                                if (typeof fromIndex === 'number' && !isNaN(fromIndex)) {
+                                                    const reordered = reorderList(task.subtasks || [], fromIndex, index, pos);
+                                                    onUpdate && onUpdate(task.id, { subtasks: reordered });
+                                                }
+                                                setDraggedSubtaskIndex(null);
+                                                setDragOverSubtaskInfo(null);
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{
+                                                position: 'relative',
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '6px',
+                                                padding: '3px 2px',
+                                                borderBottom: '1px dashed var(--border-color)',
+                                                opacity: isDraggingThis ? 0.35 : 1,
+                                                background: isDraggingThis ? 'var(--accent-bg, rgba(59, 130, 246, 0.05))' : 'transparent',
+                                                borderRadius: '4px',
+                                                transition: 'opacity 0.15s ease, background 0.15s ease'
+                                            }}
+                                        >
+                                            {/* Blue accent insertion drop line indicator, matching main task list */}
+                                            {(showTopIndicator || showBottomIndicator) && (
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: showTopIndicator ? '-2px' : 'auto',
+                                                        bottom: showBottomIndicator ? '-2px' : 'auto',
+                                                        left: '0px',
+                                                        right: '0px',
+                                                        height: '3px',
+                                                        background: 'var(--accent-color)',
+                                                        borderRadius: '1.5px',
+                                                        boxShadow: '0 0 8px var(--accent-color)',
+                                                        zIndex: 100,
+                                                        pointerEvents: 'none',
+                                                        display: 'flex',
+                                                        alignItems: 'center'
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            width: '6px',
+                                                            height: '6px',
+                                                            borderRadius: '50%',
+                                                            background: 'var(--accent-color)',
+                                                            marginLeft: '-3px',
+                                                            boxShadow: '0 0 5px var(--accent-color)'
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div
+                                                className="subtask-drag-handle"
+                                                onTouchStart={(e) => handleSubtaskTouchStart(e, index)}
+                                                onMouseDown={(e) => {
+                                                    if (window.getSelection) {
+                                                        window.getSelection().removeAllRanges();
+                                                    }
+                                                }}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: isDraggingThis ? 'grabbing' : 'grab',
+                                                    padding: '4px 6px',
+                                                    minWidth: '28px',
+                                                    minHeight: '28px',
+                                                    color: isDraggingThis ? 'var(--accent-color)' : 'var(--muted-text)',
+                                                    opacity: isDraggingThis ? 1 : 0.7,
+                                                    flexShrink: 0,
+                                                    touchAction: 'none',
+                                                    userSelect: 'none',
+                                                    WebkitUserSelect: 'none',
+                                                    borderRadius: '4px',
+                                                    background: 'var(--border-color, rgba(0,0,0,0.05))'
+                                                }}
+                                                title="Drag to rearrange subtask (or use Alt+Up / Alt+Down)"
+                                                aria-label="Drag to rearrange subtask"
+                                            >
+                                                <GripVertical size={14} />
+                                            </div>
+                                            <textarea
+                                                ref={(el) => {
+                                                    if (el) {
+                                                        el.style.height = 'auto';
+                                                        el.style.height = `${Math.max(el.scrollHeight, 24)}px`;
+                                                    }
+                                                }}
+                                                value={st.text}
+                                                rows={1}
+                                                draggable={false}
+                                                onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                onKeyDown={(e) => {
+                                                    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                                                        e.preventDefault();
+                                                        if (e.key === 'ArrowUp' && index > 0) {
+                                                            const reordered = reorderList(task.subtasks || [], index, index - 1, 'before');
+                                                            onUpdate && onUpdate(task.id, { subtasks: reordered });
+                                                        } else if (e.key === 'ArrowDown' && index < (task.subtasks || []).length - 1) {
+                                                            const reordered = reorderList(task.subtasks || [], index, index + 1, 'after');
+                                                            onUpdate && onUpdate(task.id, { subtasks: reordered });
+                                                        }
+                                                    }
+                                                }}
+                                                onChange={(e) => {
+                                                    const updatedText = e.target.value;
+                                                    const updated = (task.subtasks || []).map(s => s.id === st.id ? { ...s, text: updatedText } : s);
+                                                    onUpdate && onUpdate(task.id, { subtasks: updated });
+                                                }}
+                                                onInput={(e) => {
+                                                    e.target.style.height = 'auto';
+                                                    e.target.style.height = `${Math.max(e.target.scrollHeight, 24)}px`;
+                                                }}
+                                                placeholder="Subtask step..."
+                                                style={{
+                                                    flex: 1,
+                                                    border: 'none',
+                                                    background: 'transparent',
+                                                    fontSize: '0.88rem',
+                                                    color: st.completed ? 'var(--muted-text)' : 'var(--text-color)',
+                                                    textDecoration: st.completed ? 'line-through' : 'none',
+                                                    outline: 'none',
+                                                    padding: '2px 4px',
+                                                    margin: '0 4px',
+                                                    borderRadius: '4px',
+                                                    fontFamily: 'inherit',
+                                                    resize: 'none',
+                                                    overflowY: 'hidden',
+                                                    wordBreak: 'break-word',
+                                                    whiteSpace: 'pre-wrap',
+                                                    lineHeight: '1.4',
+                                                    minHeight: '24px',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                onFocus={(e) => {
+                                                    e.target.style.background = 'var(--bg-color)';
+                                                    e.target.style.boxShadow = '0 0 0 1px var(--accent-color)';
+                                                    e.target.style.height = 'auto';
+                                                    e.target.style.height = `${Math.max(e.target.scrollHeight, 24)}px`;
+                                                }}
+                                                onBlur={(e) => {
+                                                    e.target.style.background = 'transparent';
+                                                    e.target.style.boxShadow = 'none';
+                                                    if (!st.text.trim()) {
+                                                        const updated = (task.subtasks || []).filter(s => s.id !== st.id);
+                                                        onUpdate && onUpdate(task.id, { subtasks: updated });
+                                                    }
+                                                }}
+                                            />
+                                            <input
+                                                type="checkbox"
+                                                draggable={false}
+                                                onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                checked={st.completed}
+                                                onChange={() => {
+                                                    const updated = toggleSubtaskStatus(task.subtasks || [], st.id);
+                                                    onUpdate && onUpdate(task.id, { subtasks: updated });
+                                                }}
+                                                aria-label={st.completed ? "Mark subtask incomplete" : "Mark subtask completed"}
+                                                title={st.completed ? "Mark incomplete" : "Mark completed"}
+                                                style={{ cursor: 'pointer', width: '15px', height: '15px', flexShrink: 0, marginTop: '4px', marginRight: '2px' }}
+                                            />
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                )}
+
+                {effectiveShowFull && (task.notes || (task.photos && task.photos.length > 0)) && (
+                    <div style={{ marginTop: '6px', width: '100%' }}>
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowNotesExpanded(!showNotesExpanded); }}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                border: '1px solid var(--border-color)',
+                                background: showNotesExpanded ? 'var(--accent-bg)' : 'var(--item-bg)',
+                                color: showNotesExpanded ? 'var(--accent-color)' : 'var(--muted-text)',
+                                cursor: 'pointer',
+                                fontSize: '0.7rem',
+                                fontWeight: '600'
+                            }}
+                        >
+                            {(() => {
+                                const hasPhotos = task.photos && task.photos.length > 0;
+                                if (hasPhotos) {
+                                    return showNotesExpanded ? '▾ Hide Photos' : '▸ Show Photos';
+                                }
+                                return showNotesExpanded ? '▾ Hide Notes' : '▸ Show Notes';
+                            })()}
+                        </button>
+                        <AnimatePresence>
+                            {showNotesExpanded && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                    style={{
+                                        fontSize: '0.92rem',
+                                        color: 'var(--muted-text)',
+                                        marginTop: '6px',
+                                        padding: '8px 12px',
+                                        background: 'rgba(0,0,0,0.03)',
+                                        borderRadius: '6px',
+                                        borderLeft: '3px solid var(--accent-color)',
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        lineHeight: '1.4',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {task.notes && <div>{renderActionableText(task.notes)}</div>}
+                                    {task.photos && task.photos.length > 0 && (
+                                        <div style={{ marginTop: task.notes ? '8px' : '0' }}>
+                                            <PhotoAttachments
+                                                photos={task.photos}
+                                                readOnly={true}
+                                            />
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
+                    </>
+                )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '8px', alignSelf: hasExtraDetails ? 'flex-start' : 'center', marginTop: hasExtraDetails ? '2px' : '0' }}>
+                {isArchived ? (
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onRestore && onRestore(task.id); }}
+                        style={{
+                            ...styles.actionBtn,
+                            color: '#3b82f6',
+                            background: 'rgba(59, 130, 246, 0.08)',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                            borderRadius: '6px',
+                            width: 'var(--task-action-btn-size, 32px)',
+                            height: 'var(--task-action-btn-size, 32px)',
+                            minWidth: 'var(--task-action-btn-size, 32px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: '0px'
+                        }}
+                        title="Restore task to live system"
+                    >
+                        <RotateCcw size={16} />
+                    </button>
+                ) : (
+                    <>
+                        {!isLite && task.scheduledDate && (
+                            <motion.button
+                                onClick={(e) => { e.stopPropagation(); setShowQuickSchedule(!showQuickSchedule); }}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                onTouchMove={(e) => e.stopPropagation()}
+                                onTouchEnd={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onPointerMove={(e) => e.stopPropagation()}
+                                onPointerUp={(e) => e.stopPropagation()}
+                                style={{
+                                    ...styles.actionBtn,
+                                    color: task.isRecurring ? '#10b981' : 'var(--accent-color)',
+                                    background: showQuickSchedule ? (task.isRecurring ? 'rgba(16, 185, 129, 0.15)' : 'var(--accent-bg)') : 'transparent',
+                                    border: `1px solid ${task.isRecurring ? '#10b981' : 'var(--accent-color)'}`,
+                                    marginRight: '6px',
+                                    opacity: 1.0,
+                                    width: 'var(--task-action-btn-size, 32px)',
+                                    height: 'var(--task-action-btn-size, 32px)',
+                                    minWidth: 'var(--task-action-btn-size, 32px)'
+                                }}
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                title={task.isRecurring ? "Recurring schedule / Defer task" : "Change schedule / Defer task"}
+                            >
+                                {task.isRecurring ? <Repeat size={17} /> : <Calendar size={17} />}
+                            </motion.button>
+                        )}
+                        <motion.button
+                            onClick={handleComplete}
+                            onTouchStart={(e) => {
+                                e.stopPropagation();
+                                isSwipingRef.current = false;
+                                wasSwipingRef.current = false;
+                                isScrollingVerticalRef.current = false;
+                                setSwipeOffset(0);
+                            }}
+                            onTouchMove={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => {
+                                e.stopPropagation();
+                                isSwipingRef.current = false;
+                                wasSwipingRef.current = false;
+                                isScrollingVerticalRef.current = false;
+                            }}
+                            onPointerDown={(e) => {
+                                e.stopPropagation();
+                                isSwipingRef.current = false;
+                                wasSwipingRef.current = false;
+                                isScrollingVerticalRef.current = false;
+                            }}
+                            onPointerMove={(e) => e.stopPropagation()}
+                            onPointerUp={(e) => e.stopPropagation()}
+                            style={{
+                                ...styles.actionBtn,
+                                minWidth: 'var(--task-action-btn-size, 32px)',
+                                minHeight: 'var(--task-action-btn-size, 32px)',
+                                width: 'var(--task-action-btn-size, 32px)',
+                                height: 'var(--task-action-btn-size, 32px)',
+                                touchAction: 'manipulation',
+                                color: isChecked ? '#10b981' : 'var(--muted-text)',
+                                background: isChecked ? 'rgba(16, 185, 129, 0.15)' : 'transparent'
+                            }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9, backgroundColor: 'rgba(16, 185, 129, 0.2)' }}
+                            title={isChecked ? "Cancel completion" : "Complete Task"}
+                        >
+                            <AnimatePresence mode="wait" initial={false}>
+                                {isChecked ? (
+                                    <motion.div
+                                        key="check"
+                                        initial={{ opacity: 0, scale: 0.5 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.5 }}
+                                        transition={{ duration: 0.1 }}
+                                    >
+                                        <CheckSquare size={18} strokeWidth={2.5} />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key="square"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.1 }}
+                                    >
+                                        <Square size={18} opacity={isHovered ? 1.0 : 0.6} />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </motion.button>
+                    </>
+                )}
+            </div>
+        </motion.li>
+        </div>
+    );
+};
+
+const areTaskItemPropsEqual = (prevProps, nextProps) => {
+    return (
+        prevProps.task === nextProps.task &&
+        prevProps.isArchived === nextProps.isArchived &&
+        prevProps.isDragging === nextProps.isDragging &&
+        prevProps.isDragOver === nextProps.isDragOver &&
+        prevProps.projectColor === nextProps.projectColor &&
+        prevProps.projectName === nextProps.projectName &&
+        prevProps.showFullDetails === nextProps.showFullDetails &&
+        prevProps.dateFormat === nextProps.dateFormat &&
+        prevProps.taskViewMode === nextProps.taskViewMode &&
+        prevProps.viewProfile === nextProps.viewProfile &&
+        prevProps.timeSchedulingEnabled === nextProps.timeSchedulingEnabled &&
+        prevProps.swipeSettings === nextProps.swipeSettings &&
+        prevProps.onComplete === nextProps.onComplete &&
+        prevProps.onDelete === nextProps.onDelete &&
+        prevProps.onRestore === nextProps.onRestore &&
+        prevProps.onEdit === nextProps.onEdit &&
+        prevProps.onUpdate === nextProps.onUpdate &&
+        prevProps.onSwipeAction === nextProps.onSwipeAction &&
+        prevProps.onDragStart === nextProps.onDragStart &&
+        prevProps.onDragOver === nextProps.onDragOver &&
+        prevProps.onDrop === nextProps.onDrop &&
+        prevProps.onDragEnd === nextProps.onDragEnd &&
+        prevProps.dragHandlers === nextProps.dragHandlers
+    );
+};
+
+export default React.memo(TaskItem, areTaskItemPropsEqual);

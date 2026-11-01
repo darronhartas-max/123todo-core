@@ -1,0 +1,296 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Check, X } from 'lucide-react';
+import { COMMON_STYLES } from '../../utils/styles';
+import { RELEASE_CHANGELOG, APP_VERSION } from '../../utils/constants';
+
+const UpdatedModal = ({ oldVersion, newVersion, onClose }) => {
+    const styles = {
+        updatedModal: {
+            background: 'var(--surface-color)',
+            color: 'var(--text-color)',
+            padding: '28px 24px',
+            borderRadius: '16px',
+            maxWidth: '90%',
+            width: '460px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
+            textAlign: 'center',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            border: '1px solid var(--border-color)',
+            position: 'relative'
+        },
+        closeBtn: {
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'var(--surface-color)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--muted-text)',
+            cursor: 'pointer',
+            padding: '7px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+            zIndex: 10
+        },
+        badgeContainer: {
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '16px',
+            margin: '20px 0',
+            background: 'var(--bg-color)',
+            padding: '16px',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)'
+        },
+        versionBadge: {
+            background: 'rgba(59, 130, 246, 0.1)',
+            color: '#3b82f6',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            fontWeight: '700',
+            fontFamily: 'monospace',
+            fontSize: '1.05rem'
+        },
+        arrow: {
+            color: 'var(--muted-text)',
+            fontWeight: '800',
+            fontSize: '1.2rem'
+        },
+        newBadge: {
+            background: 'rgba(16, 185, 129, 0.1)',
+            color: '#10b981',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            fontWeight: '700',
+            fontFamily: 'monospace',
+            fontSize: '1.05rem',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            boxShadow: '0 0 8px rgba(16, 185, 129, 0.15)'
+        },
+        iconCircle: {
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%)',
+            color: 'var(--accent-color)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px auto',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
+        },
+        buttonContainer: {
+            display: 'flex',
+            gap: '10px',
+            marginTop: '16px',
+            width: '100%'
+        },
+        closeButton: {
+            flex: 1,
+            padding: '12px 18px',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            fontSize: '1rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            background: 'var(--item-bg, rgba(0,0,0,0.05))',
+            color: 'var(--text-color)',
+            transition: 'all 0.2s ease'
+        },
+        button: {
+            flex: 1.5,
+            padding: '12px 18px',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '1rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #10b981 100%)',
+            color: 'white',
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease'
+        }
+    };
+
+    return (
+        <div
+            style={{
+                ...COMMON_STYLES.modalOverlay,
+                zIndex: 2500
+            }}
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.3, cubicBezier: [0.16, 1, 0.3, 1] }}
+                style={styles.updatedModal}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <button
+                    onClick={onClose}
+                    style={styles.closeBtn}
+                    aria-label="Close modal"
+                    title="Close"
+                >
+                    <X size={18} />
+                </button>
+                <div style={styles.iconCircle}>
+                    <Check size={28} />
+                </div>
+                
+                <h2 style={{ margin: '0 0 10px 0', fontSize: '1.5rem', fontWeight: '800', letterSpacing: '-0.3px' }}>
+                    123 To Do Updated!
+                </h2>
+                
+                <p style={{ margin: '0 0 20px 0', color: 'var(--muted-text)', fontSize: '1.05rem', lineHeight: '1.4' }}>
+                    The application has successfully updated to the latest version in the background.
+                </p>
+
+                {oldVersion && oldVersion !== newVersion ? (
+                    <div style={styles.badgeContainer}>
+                        <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--muted-text)', marginBottom: '4px', fontWeight: '600' }}>PREVIOUS</div>
+                            <div style={styles.versionBadge}>v{oldVersion}</div>
+                        </div>
+                        <div style={styles.arrow}>→</div>
+                        <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--muted-text)', marginBottom: '4px', fontWeight: '600' }}>CURRENT</div>
+                            <div style={styles.newBadge}>v{newVersion}</div>
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ ...styles.badgeContainer, justifyContent: 'center' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--muted-text)', marginBottom: '4px', fontWeight: '600' }}>CURRENT VERSION</div>
+                            <div style={styles.newBadge}>v{newVersion}</div>
+                        </div>
+                    </div>
+                )}
+
+                {(() => {
+                    const entries = Object.entries(RELEASE_CHANGELOG);
+                    const targetVer = newVersion || APP_VERSION;
+                    let startIndex = entries.findIndex(([ver]) => ver === targetVer);
+                    if (startIndex === -1) startIndex = 0;
+                    const recentVersions = entries.slice(startIndex, startIndex + 5);
+
+                    if (recentVersions.length === 0) {
+                        recentVersions.push([targetVer, [
+                            { title: '🔄 Silent Background Updates:', desc: 'App updates automatically in the background without user intervention.' },
+                            { title: '🕒 Evidentiary Timestamps:', desc: '1-click timestamped notes and visible creation timestamps in task edit modal.' },
+                            { title: '📐 Compact Footer & Settings Sync Button:', desc: 'Streamlined footer layout with integrated sync status button in Settings.' }
+                        ]]);
+                    }
+
+                    return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', margin: '16px 0' }}>
+                            {recentVersions.map(([ver, highlights], vIdx) => (
+                                <div key={ver} style={{
+                                    background: 'var(--bg-color)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '12px',
+                                    padding: '14px 16px',
+                                    fontSize: '0.9rem',
+                                    textAlign: 'left',
+                                    color: 'var(--text-color)'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                                        <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--accent-color)' }}>
+                                            ✨ What's New in v{ver}:
+                                        </div>
+                                        {ver === (newVersion || APP_VERSION) && (
+                                            <span style={{
+                                                fontSize: '0.72rem',
+                                                fontWeight: '700',
+                                                color: '#10b981',
+                                                background: 'rgba(16, 185, 129, 0.1)',
+                                                border: '1px solid rgba(16, 185, 129, 0.2)',
+                                                padding: '2px 8px',
+                                                borderRadius: '10px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.5px'
+                                            }}>
+                                                Latest
+                                            </span>
+                                        )}
+                                    </div>
+                                    <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px', lineHeight: '1.4' }}>
+                                        {highlights.map((item, idx) => (
+                                            <li key={idx}>
+                                                <strong>{item.title}</strong> {item.desc}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()}
+
+                <div style={{
+                    background: 'rgba(16, 185, 129, 0.05)',
+                    border: '1px solid rgba(16, 185, 129, 0.1)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    margin: '12px 0',
+                    fontSize: '0.9rem',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    color: 'var(--text-color)'
+                }}>
+                    <Check size={18} style={{ color: '#10b981', flexShrink: 0 }} strokeWidth={3} />
+                    <span>All your settings, custom projects, and tasks were safely preserved.</span>
+                </div>
+
+                <div style={styles.buttonContainer}>
+                    <button
+                        onClick={onClose}
+                        style={styles.closeButton}
+                    >
+                        Close
+                    </button>
+                    <button
+                        onClick={onClose}
+                        style={styles.button}
+                    >
+                        Awesome, Let's Go!
+                    </button>
+                </div>
+
+                <div style={{ marginTop: '14px', textAlign: 'center' }}>
+                    <a
+                        href="https://www.123todo.com/changelog"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            color: 'var(--accent-color)',
+                            fontSize: '0.88rem',
+                            fontWeight: '600',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                        }}
+                    >
+                        View Full Release Changelog (v1.0 to present) ↗
+                    </a>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+
+export default UpdatedModal;

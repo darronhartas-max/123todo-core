@@ -1,0 +1,260 @@
+import React, { useState, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import TaskItem from './TaskItem';
+import { PRIORITIES, STORAGE_KEYS } from '../../utils/constants';
+
+const PrioritySection = ({
+    priority,
+    tasks,
+    projects,
+    onComplete,
+    onEdit,
+    onUpdate,
+    handleDragStart,
+    handleDragOver,
+    handleDrop,
+    handleDragEnd,
+    draggedId,
+    dragOverId,
+    swipeSettings,
+    onSwipeAction,
+    dateFormat,
+    taskViewMode = 'compact',
+    viewProfile = 'lite',
+    timeSchedulingEnabled = true,
+    searchTerm = '',
+    priorityColors,
+    isWideLayout = false
+}) => {
+    const effectiveColor = (priorityColors && priorityColors[priority]) || PRIORITIES[priority]?.color;
+    const config = { ...PRIORITIES[priority], color: effectiveColor, dotColor: effectiveColor };
+    const sectionTasks = tasks.filter(t => t.priority === priority);
+
+    const projectLookup = useMemo(() => {
+        const map = new Map();
+        if (!projects || !Array.isArray(projects)) return map;
+        for (const p of projects) {
+            if (p.id) map.set(p.id.toLowerCase(), p);
+            if (p.name) map.set(p.name.toLowerCase(), p);
+        }
+        return map;
+    }, [projects]);
+
+    const [isCollapsed, setIsCollapsed] = useState(() => {
+        if (!isWideLayout && viewProfile === 'lite' && priority !== 1) {
+            return true;
+        }
+        try {
+            const stored = localStorage.getItem(STORAGE_KEYS.COLLAPSED_PRIORITIES);
+            if (stored) {
+                const list = JSON.parse(stored);
+                return Array.isArray(list) && list.includes(priority);
+            }
+        } catch (e) {}
+        return false;
+    });
+
+    React.useEffect(() => {
+        if (viewProfile === 'lite') {
+            if (priority !== 1) {
+                setIsCollapsed(true);
+            } else {
+                setIsCollapsed(false);
+            }
+        } else {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEYS.COLLAPSED_PRIORITIES);
+                if (stored) {
+                    const list = JSON.parse(stored);
+                    setIsCollapsed(Array.isArray(list) && list.includes(priority));
+                    return;
+                }
+            } catch (e) {}
+            setIsCollapsed(false);
+        }
+    }, [viewProfile, priority]);
+
+    const toggleCollapse = (e) => {
+        if (e) e.stopPropagation();
+        setIsCollapsed(prev => {
+            const nextState = !prev;
+            try {
+                const stored = localStorage.getItem(STORAGE_KEYS.COLLAPSED_PRIORITIES);
+                let list = stored ? JSON.parse(stored) : [];
+                if (!Array.isArray(list)) list = [];
+                if (nextState) {
+                    if (!list.includes(priority)) list.push(priority);
+                } else {
+                    list = list.filter(id => id !== priority);
+                }
+                localStorage.setItem(STORAGE_KEYS.COLLAPSED_PRIORITIES, JSON.stringify(list));
+            } catch (err) {}
+            return nextState;
+        });
+    };
+
+    if (sectionTasks.length === 0 && priority === 4) return null; // Hide On Hold if empty
+
+    const isSearching = Boolean(searchTerm && searchTerm.trim());
+    const isEffectiveCollapsed = isSearching ? (!isWideLayout && sectionTasks.length === 0) : isCollapsed;
+    const isDragOverSection = dragOverId === `priority-${priority}`;
+    const shouldShowList = !isEffectiveCollapsed || isDragOverSection;
+
+    const getHeadingLabel = (p, label) => {
+        if (p === 1) return label?.startsWith('1') ? label : `1 ${label}`;
+        if (p === 2) return label?.startsWith('2') ? label : `2 ${label}`;
+        if (p === 3) return label?.startsWith('3') ? label : `3 ${label}`;
+        return label;
+    };
+    const headingText = getHeadingLabel(priority, config.label);
+
+    return (
+        <div 
+            style={{ 
+                marginBottom: isWideLayout ? 'var(--section-margin, 16px)' : (isEffectiveCollapsed ? '0px' : 'var(--section-margin, 16px)'), 
+                flex: isWideLayout ? '1 1 0px' : 1, 
+                minWidth: isWideLayout ? '220px' : 0,
+                boxSizing: 'border-box'
+            }}
+            onDragOver={(e) => handleDragOver(e, `priority-${priority}`)}
+            onDrop={(e) => handleDrop(e, `priority-${priority}`)}
+        >
+            <div
+                onClick={toggleCollapse}
+                title={isEffectiveCollapsed ? `Expand ${headingText}` : `Collapse ${headingText}`}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: isWideLayout ? '10px' : (priority === 1 ? '18px' : '6px'),
+                    marginBottom: '6px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    transition: 'background-color 0.15s ease'
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h3 style={{
+                        fontSize: '0.85rem',
+                        fontWeight: '800',
+                        margin: 0,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        color: config.color,
+                        textAlign: 'left'
+                    }}>
+                        {headingText}
+                    </h3>
+                    <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        background: isEffectiveCollapsed ? 'var(--accent-bg)' : 'rgba(0, 0, 0, 0.05)',
+                        color: isEffectiveCollapsed ? 'var(--accent-color)' : 'var(--muted-text)'
+                    }}>
+                        {sectionTasks.length}
+                    </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', color: 'var(--muted-text)' }}>
+                    <button
+                        type="button"
+                        onClick={toggleCollapse}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            color: config.color
+                        }}
+                    >
+                        {isEffectiveCollapsed ? <ChevronRight size={16} color={config.color} /> : <ChevronDown size={16} color={config.color} />}
+                    </button>
+                </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+                {shouldShowList && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        style={{ overflow: 'hidden' }}
+                    >
+                        <ul 
+                            onDragOver={(e) => handleDragOver(e, `priority-${priority}`)}
+                            onDrop={(e) => handleDrop(e, `priority-${priority}`)}
+                            style={{ 
+                                listStyle: 'none', 
+                                margin: 0, 
+                                minHeight: (isDragOverSection || (isWideLayout && sectionTasks.length === 0)) ? '60px' : 'auto',
+                                border: isDragOverSection ? `2px dashed ${config.color}` : '2px dashed transparent',
+                                background: isDragOverSection ? `${config.color}14` : 'transparent',
+                                borderRadius: '6px',
+                                transition: 'all 0.2s ease',
+                                boxSizing: 'border-box',
+                                padding: isDragOverSection ? '4px 0' : '0'
+                            }}
+                        >
+                            {sectionTasks.length === 0 && isWideLayout && !isDragOverSection && (
+                                <li style={{
+                                    listStyle: 'none',
+                                    border: '1.5px dashed var(--border-color)',
+                                    borderRadius: '8px',
+                                    padding: '24px 12px',
+                                    textAlign: 'center',
+                                    color: 'var(--muted-text)',
+                                    fontSize: '0.82rem',
+                                    fontWeight: '500',
+                                    background: 'var(--item-bg)',
+                                    pointerEvents: 'none',
+                                    userSelect: 'none',
+                                    margin: '4px 0'
+                                }}>
+                                    No {config.label.toLowerCase()} tasks
+                                </li>
+                            )}
+                            <AnimatePresence initial={false}>
+                                {sectionTasks.map(task => {
+                                    const project = task.projectId ? projectLookup.get(task.projectId.toLowerCase()) : undefined;
+                                    return (
+                                        <TaskItem
+                                            key={task.id}
+                                            task={task}
+                                            projectColor={project?.color}
+                                            projectName={project?.name}
+                                            onComplete={onComplete}
+                                            onEdit={onEdit}
+                                            onUpdate={onUpdate}
+                                            swipeSettings={swipeSettings}
+                                            onSwipeAction={onSwipeAction}
+                                            dateFormat={dateFormat}
+                                            taskViewMode={taskViewMode}
+                                            viewProfile={viewProfile}
+                                            timeSchedulingEnabled={timeSchedulingEnabled}
+                                            isDragging={draggedId === task.id}
+                                            isDragOver={dragOverId === task.id}
+                                            onDragStart={handleDragStart}
+                                            onDragOver={handleDragOver}
+                                            onDrop={handleDrop}
+                                            onDragEnd={handleDragEnd}
+                                        />
+                                    );
+                                })}
+                            </AnimatePresence>
+                        </ul>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
+export default React.memo(PrioritySection);

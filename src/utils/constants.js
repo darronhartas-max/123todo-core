@@ -1,0 +1,876 @@
+import packageJson from '../../package.json';
+
+export const DEFAULT_PRIORITY_COLORS = {
+  1: '#dc2626',
+  2: '#f59e0b',
+  3: '#6b7280',
+  4: '#9333ea'
+};
+
+export const getPriorityColor = (priority, customColors = null) => {
+  if (customColors && customColors[priority]) {
+    return customColors[priority];
+  }
+  return DEFAULT_PRIORITY_COLORS[priority] || '#6b7280';
+};
+
+export const getPriorities = (customColors = null) => {
+  return {
+    1: { label: 'Must Do', color: getPriorityColor(1, customColors), dotColor: getPriorityColor(1, customColors) },
+    2: { label: 'Should Do', color: getPriorityColor(2, customColors), dotColor: getPriorityColor(2, customColors) },
+    3: { label: 'Could Do', color: getPriorityColor(3, customColors), dotColor: getPriorityColor(3, customColors) },
+    4: { label: 'On Hold', color: getPriorityColor(4, customColors), dotColor: getPriorityColor(4, customColors) }
+  };
+};
+
+export const PRIORITIES = getPriorities();
+
+export const STORAGE_KEYS = {
+  PRIORITY_COLORS: '123TodoPriorityColors',
+  TASKS: '123TodoTasks',
+  ARCHIVE: '123TodoArchive',
+  COUNTER: '123TodoCounter',
+  MILESTONES: '123TodoMilestones',
+  WELCOME_SEEN: '123TodoWelcomeSeen',
+  LAST_BACKUP: '123TodoLastBackup',
+  REMINDER_DISMISSED: '123TodoReminderDismissed',
+  INSTALL_DISMISSED: '123TodoInstallDismissed',
+  INSTALL_DISMISS_COUNT: '123TodoInstallDismissCount',
+  LAST_INSTALL_DISMISSED: '123TodoLastInstallDismissed',
+  INSTALL_ACTIONS_COUNT: '123TodoInstallActionsCount',
+  LAST_INSTALL_PROMPT: '123TodoLastInstallPrompt',
+  PROJECTS: '123TodoProjects',
+  LAST_PROJECT: '123TodoLastProject',
+  SHADOW_BACKUP: '123TodoShadowBackup',
+  LAST_SHADOW_TIME: '123TodoLastShadowTime',
+  TIMESTAMP: '123TodoTimestamp',
+  SWIPE_SETTINGS: '123TodoSwipeSettings',
+  DATE_FORMAT: '123TodoDateFormat',
+  TASK_LENGTH_LIMIT: '123TodoTaskLengthLimit',
+  DELETED_PROJECTS: '123TodoDeletedProjects',
+  DELETED_TASKS: '123TodoDeletedTasks',
+  SYNC_PROVIDER: '123Todo_SyncProvider',
+  CF_SYNC_ID: '123Todo_CF_SyncId',
+  CF_DEVICE_TOKEN: '123Todo_CF_DeviceToken',
+  APP_MODE: '123TodoAppMode',
+  MODE_DISCOVERY_COUNT: '123TodoModeDiscoveryCount',
+  NOTES_FONT_SIZE: '123TodoNotesFontSize',
+  TASK_VIEW_MODE: '123TodoTaskViewMode',
+  EMAIL_CLIENT_PREFERENCE: '123TodoEmailClientPreference',
+  NOTES_AUTOSAVE_DELAY: '123TodoNotesAutosaveDelay',
+  VIEW_PROFILE: '123Todo_ViewProfile',
+  SCREEN_SCALING_MODE: '123TodoScreenScalingMode',
+  TENANT: '123Todo_Tenant',
+  NOTIFICATIONS_ENABLED: '123TodoNotificationsEnabled',
+  TIME_SCHEDULING_ENABLED: '123Todo_TimeSchedulingEnabled',
+  BUTTON_DISPLAY_MODE: '123Todo_ButtonDisplayMode',
+  SHOW_TASK_CREATION_DATE: '123Todo_ShowTaskCreationDate',
+  STARTED_USING: '123TodoStartedUsing',
+  FONT_SIZE: '123TodoFontSize',
+  THEME_MODE: '123TodoThemeMode',
+  BOLD_FONT: '123TodoBoldFont',
+  SYNC_PASSPHRASE: '123Todo_Sync_Passphrase',
+  GOOGLE_AUTHED: '123Todo_Google_Authed',
+  GOOGLE_ACCESS_TOKEN: '123Todo_Google_AccessToken',
+  GOOGLE_TOKEN_EXPIRY: '123Todo_Google_TokenExpiry',
+  COLLAPSED_PRIORITIES: '123Todo_Collapsed_Priorities',
+  TASK_SECTIONS_PREFIX: '123todo_task_sections_',
+  ADMIN_PASS_HASH: '123TodoAdminPassHash',
+  ADMIN_PASSWORD_HASH: '123TodoAdminPassHash',
+  LAYOUT_WIDTH: '123TodoLayoutWidth',
+  WIDE_COLUMN_VIEW: '123TodoWideColumnView',
+  SYNC_SPEED: '123Todo_Sync_Speed',
+  CHIEF_PROGRAMMER: '123Todo_ChiefProgrammer',
+  LIGHT_MODE_TONE: '123TodoLightModeTone',
+  LAST_SEEN_VERSION: '123Todo_Last_Seen_Version',
+  PREVIOUS_VERSION: '123Todo_Previous_Version',
+  SHOW_UPDATED_MODAL: '123Todo_Show_Updated_Modal',
+  TELEMETRY_STATS: '123TodoTelemetryStats',
+  LAST_VISIT_DATE: '123TodoLastVisitDate',
+  BOOSTER_ENABLED: '123Todo_Booster_Enabled',
+  BOOSTER_LICENSE: '123Todo_Booster_License'
+};
+
+export const BUTTON_DISPLAY_MODES = [
+  { id: 'icons', label: 'Icons (Clean)', desc: 'Show clean icons for features and actions with ample spacing' },
+  { id: 'both', label: 'Icons & Text', desc: 'Show both icons and descriptive text labels together' },
+  { id: 'text', label: 'Text Only', desc: 'Show text labels only without icons' }
+];
+
+export const DEFAULT_BUTTON_DISPLAY_MODE = 'icons';
+
+export const DEFAULT_TIME_SCHEDULING_ENABLED = true;
+
+export const DEFAULT_SHOW_TASK_CREATION_DATE = false;
+
+export const SCREEN_SCALING_MODES = [
+  { id: 'auto', label: 'Auto (Recommended)', desc: 'Automatically adapts to device screen width & pixel density' },
+  { id: 'compact', label: 'Compact (Older / Smaller Phones)', desc: 'Optimized typography and tight spacing for compact screens' },
+  { id: 'standard', label: 'Standard', desc: 'Default comfortable spacing and typography across all screens' }
+];
+
+export const DEFAULT_SCREEN_SCALING_MODE = 'auto';
+
+export const NOTES_AUTOSAVE_OPTIONS = [
+  { id: '30s', label: '30 Seconds', seconds: 30, desc: 'Quick on-site saving' },
+  { id: '60s', label: '1 Minute (Default)', seconds: 60, desc: 'Balanced for notes & estimating' },
+  { id: '120s', label: '2 Minutes', seconds: 120, desc: 'Relaxed note-taking & contemplation' },
+  { id: '300s', label: '5 Minutes', seconds: 300, desc: 'Extended drafting for detailed quotes' },
+  { id: 'off', label: 'Manual Only', seconds: 0, desc: 'Auto-save disabled; save via button or app switch' }
+];
+
+export const DEFAULT_NOTES_AUTOSAVE_DELAY = '60s';
+
+export const DATE_FORMAT_OPTIONS = [
+  { id: 'UK', label: 'UK / International', format: 'DD/MM/YYYY', example: '15/08/2026' },
+  { id: 'US', label: 'US Style', format: 'MM/DD/YYYY', example: '08/15/2026' },
+  { id: 'ISO', label: 'ISO Standard', format: 'YYYY-MM-DD', example: '2026-08-15' },
+  { id: 'UK_TEXT', label: 'UK Text', format: '15 Aug 2026', example: '15 Aug 2026' },
+  { id: 'US_TEXT', label: 'US Text', format: 'Aug 15, 2026', example: 'Aug 15, 2026' }
+];
+
+export const DEFAULT_DATE_FORMAT = 'UK';
+
+export const SWIPE_ACTIONS = {
+  complete: { label: 'Complete Task', actionHint: 'Complete', icon: 'CheckSquare', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', activeBg: '#10b981', activeColor: '#ffffff' },
+  delete: { label: 'Delete Task', actionHint: 'Delete', icon: 'Trash2', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', activeBg: '#ef4444', activeColor: '#ffffff' },
+  priority_4: { label: 'On Hold (P4)', actionHint: 'Hold (P4)', icon: 'PauseCircle', color: '#9333ea', bg: 'rgba(147, 51, 234, 0.15)', activeBg: '#9333ea', activeColor: '#ffffff' },
+  edit: { label: 'Edit Task', actionHint: 'Edit', icon: 'Edit2', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.15)', activeBg: '#2563eb', activeColor: '#ffffff' },
+  none: { label: 'None (Disabled)', actionHint: '', icon: 'Slash', color: '#9ca3af', bg: 'transparent', activeBg: 'transparent', activeColor: '#9ca3af' }
+};
+
+export const DEFAULT_SWIPE_SETTINGS = {
+  enabled: true,
+  swipeRight: 'complete',
+  swipeLeft: 'delete'
+};
+
+export const PROJECT_COLORS = [
+  // Line 1: Warm & Green spectrum
+  '#b91c1c', // 1. Crimson Red
+  '#ea580c', // 2. Burnt Orange / Coral
+  '#f97316', // 3. Mandarin Orange
+  '#d97706', // 4. Warm Amber
+  '#eab308', // 5. Sunflower Yellow
+  '#84cc16', // 6. Lime Green
+  '#22c55e', // 7. Leaf Green
+  '#065f46', // 8. Forest Green
+  '#10b981', // 9. Emerald Green
+  '#14b8a6', // 10. Teal Green
+  // Line 2: Cool, Purple & Pink spectrum
+  '#06b6d4', // 11. Bright Cyan
+  '#0ea5e9', // 12. Cerulean Sky Blue
+  '#3b82f6', // 13. Vivid Blue
+  '#285a82', // 14. Ocean Blue
+  '#6366f1', // 15. Indigo Blue
+  '#8b5cf6', // 16. Royal Violet
+  '#a855f7', // 17. Amethyst Purple
+  '#d946ef', // 18. Fuchsia Purple
+  '#ec4899', // 19. Sweet Pink
+  '#f43f5e', // 20. Ruby Rose
+];
+
+export const PROJECT_COLOR_MIGRATION = {
+  '#f59e0b': '#d97706', // Old Amber (matched P2) -> new Warm Amber
+  '#78716c': '#285a82', // Old Slate Gray -> Ocean Blue
+  '#dc2626': '#b91c1c', // Master Priority 1 Red -> Crimson Red
+  '#6b7280': '#285a82', // Master Priority 3 Slate -> Ocean Blue
+  '#9333ea': '#a855f7', // Master Priority 4 Purple -> Amethyst Purple
+};
+
+export const migrateProjectColor = (color) => {
+  if (!color || typeof color !== 'string') return color;
+  const normalized = color.trim().toLowerCase();
+  return PROJECT_COLOR_MIGRATION[normalized] || color;
+};
+
+
+export const DEFAULT_PROJECTS = [
+  { id: 'all', name: 'All', color: '#6b7280' }
+];
+
+export const MAX_TASK_LENGTH = 250;
+export const DEFAULT_TASK_LENGTH_LIMIT = '250';
+export const DEFAULT_LIGHT_MODE_TONE = 'muted';
+export const DEFAULT_TASK_VIEW_MODE = 'compact';
+export const DEFAULT_VIEW_PROFILE = 'lite';
+// Notes length is intentionally unlimited to support full Todoist migration and rich task descriptions.
+export const BACKUP_REMINDER_DAYS = 7;
+export const INSTALL_PROMPT_DAYS = 3;
+export const APP_VERSION = packageJson.version;
+
+export const RELEASE_CHANGELOG = {
+  '3.8.26': [
+    { title: '🛡️ Production Code Protection & Key Rotation:', desc: 'Rotated asymmetric cryptographic public verification keys to ensure strict license integrity. Disabled production source map generation to protect proprietary client bundle logic, and isolated private licensing tools strictly to offline environments.' }
+  ],
+  '3.8.25': [
+    { title: '🔒 Cryptographic Licensing Engine & Security Hardening:', desc: 'Enhanced Booster tier activation with robust asymmetric digital signature verification (ECDSA P-256 with SHA-256), ensuring secure offline software licensing for open-source distributions. Added seamless 1-click URL license activation and in-app Booster license management in Settings.' }
+  ],
+  '3.8.24': [
+    { title: '⚡ Performance Tier Architecture & Booster Backend:', desc: 'Introduced high-performance tier architecture with optimized resource quotas for free accounts (2 photos per note, 7 custom projects, 7 subtasks per task, 60s background sync with instant pull on app launch and pull-to-refresh, and 90-day archive search indexing with complete background preservation). Integrated the underlying Booster engine providing uncapped project hierarchies, up to 15 note photos, unlimited subtasks, infinite archive history, and 8-second Turbo Sync.' }
+  ],
+  '3.8.23': [
+    { title: '🎙️ Far-Right Mic Button with Safe Spacing & Auto-Append Dictation:', desc: 'Moved the prominent microphone button to the far right edge of the Add Note card with the circular close button safely to its left separated by 18px of touch padding to prevent accidental dismissals. In Notes view mode, starting voice dictation now automatically appends to the bottom of the note on a fresh new line, immediately focusing and placing the cursor at the end.' }
+  ],
+  '3.8.22': [
+    { title: '🧤 Gloves-Optimized Add Note Interface in Notes Mode:', desc: 'Redesigned the Add Note card in Notes mode to match the streamlined Tasks mode layout while optimizing specifically for field workers and gloves wearers: placed prominent Mic and Camera shutter buttons on the right-hand side for effortless one-thumb mobile access, added a high-contrast prominent Save button (44px touch target), adopted the circular Tasks-mode cancel button, and removed redundant instruction text.' }
+  ],
+  '3.8.21': [
+    { title: '🔄 Unified Task & Note Editing Interface:', desc: 'In Notes mode, editing an existing note or task now opens the exact same comprehensive editor modal interface as Tasks mode. Users enjoy complete feature parity including color-coded priority pickers, project selectors, voice dictation, subtask reordering, expandable notes, photo attachments, and date/time scheduling.' }
+  ],
+  '3.8.20': [
+    { title: '📝 Note Placement at Bottom of Priority 1 (Focus Protection):', desc: 'When creating a new note in Notes mode, it is now placed at the bottom of the "1 Must Do" list in Tasks view (rather than jumping to the top), preserving your primary daily focus tasks while keeping notes neatly organized in Priority 1.' },
+    { title: '✏️ Note Editing UX Alignment & Streamlined Actions (Phase 3):', desc: 'Aligned the subsequent note editing experience in Notes view with Tasks mode, featuring an action buttons row with toggleable Details and Subtasks, direct in-editor Priority selection (P1–P4), sleek themed checklist checkboxes, and a clean metadata footer.' }
+  ],
+  '3.8.19': [
+    { title: '📐 Generous Notes Header Touch Spacing:', desc: 'Added generous spacing (24px gap) between the Add Note button and Settings icon in the Notes header bar, giving users comfortable touch separation and eliminating accidental clicks into Settings when adding new notes on mobile screens.' },
+    { title: '🎙️ Voice Dictation UI & Error Feedback Parity in Notes:', desc: 'Brought Notes voice dictation into complete parity with Tasks mode, adding prominent glowing recording indicators, active "Listening..." states, and 1-tap direct navigation to Settings if microphone access is blocked.' },
+    { title: '⌨️ Command Palette in Notes Search:', desc: 'Integrated the ⌘K / Ctrl+K Command Palette shortcut badge directly into the Notes search bar for instant keyboard-driven actions, searches, and navigation.' }
+  ],
+  '3.8.18': [
+    { title: '🎨 Native Theming & Semantic Styling in Notes (Phase 1):', desc: 'Replaced legacy hardcoded colors throughout Notes view, Quick Add, Note Cards, and batch action toolbars with dynamic semantic CSS theme tokens. All note components now adapt seamlessly to Dark Mode, custom accent colors, and light-mode tones with refined typography and card padding.' }
+  ],
+  '3.8.17': [
+    { title: '🔄 Recurring Tasks Advance in Scheduled Section (Zero Archive Clutter):', desc: 'When completing or archiving a task with a recurring profile, it no longer goes into the completed Archive. Instead, it seamlessly remains in the Scheduled section with its schedule advanced to its next appearance, subtask checklists refreshed, and original attributes preserved.' }
+  ],
+  '3.8.16': [
+    { title: '🎙️ Intuitive Recording States for Mic Icons:', desc: 'Styled all voice dictation microphone icons with a soft faded red hue in idle state and vivid bright red when actively recording, creating a clear visual cue across Add Task, Edit Task, Voice Notes, and Settings.' }
+  ],
+  '3.8.15': [
+    { title: '🎙️ Live Microphone Check & Audio Level Meter:', desc: 'Added a real-time microphone test and VU audio level meter to Settings → Voice so users can instantly verify audio capture, view connected audio devices, and receive smart diagnostics for external audio interfaces (like Focusrite Scarlett) and laptop closed-mode setups.' },
+    { title: '🛡️ Seamless Audio Permission & Clear Guidance:', desc: 'Added proactive microphone access verification, refined permission error feedback, and clear troubleshooting instructions for web browsers and installed desktop PWAs.' }
+  ],
+  '3.8.14': [
+    { title: '📐 Balanced Section Spacing & Uncramped Views:', desc: 'Added comfortable vertical spacing above the "1 Must Do" priority heading below project tabs and below the "Scheduled & Recurring" heading in collapsed view, eliminating cramped layouts and balancing space above the Archive section.' },
+    { title: '📅 Refined Header Date Size & Width Fit:', desc: 'Slightly enlarged the header date typography for crisper legibility while constraining its width so it never exceeds the Tasks/Notes mode toggle pill directly above it.' }
+  ],
+  '3.8.13': [
+    { title: '🎨 Polished Header Date Spacing:', desc: 'Added polished breathing room and a visual spacing gap between the top date and the Tasks/Notes toggle pill in the header for a refined aesthetic.' },
+    { title: '📐 Uniform Line Spacing Across Collapsed Priorities:', desc: 'Standardized the vertical line spacing between all collapsed priority headings (1 Must Do, 2 Should Do, 3 Could Do, On Hold, and Scheduled) for consistent visual rhythm.' },
+    { title: '📦 Direct Archive Opening Without Keyboard Pop-up:', desc: 'Removed automatic input focusing on the Archive search bar so mobile users can immediately view recently archived tasks without the virtual keyboard obscuring the list.' }
+  ],
+  '3.8.12': [
+    { title: '📅 Today\'s Date in Top Header:', desc: 'Added today\'s date formatted to your preferred date setting right below the Tasks/Notes toggle at the top of the header, providing convenient instant visibility on mobile screens.' },
+    { title: '🔢 1-2-3 Priority Headings & Uniform Badges:', desc: 'Numbered priority headings to "1 Must Do", "2 Should Do", and "3 Could Do" to align with the core 1-2-3 methodology. Replaced plain count text in On Hold and Scheduled headings with matching circular count badge pills.' },
+    { title: '✨ Clean Archive Trigger & Streamlined Spacing:', desc: 'Simplified the Archive section heading to clean "Archive" without icon clutter, and eliminated extraneous vertical spacing between priority sections for consistent line spacing.' }
+  ],
+  '3.8.11': [
+    { title: '📋 Stable Kanban Columns on Empty Board:', desc: 'Fixed an issue in the desktop Kanban columns layout where clearing all tasks caused categories to collapse into a narrow strip on the left. Priority columns now remain evenly distributed across the board with dedicated drop targets and empty-state indicators. This bug fix was kindly suggested by user \'Fae\'.' }
+  ],
+  '3.8.10': [
+    { title: '🎨 Customizable Priority Label Colors in Settings:', desc: 'Added priority color customization in Settings under Tasks. Users can now choose distinct colors for Must Do, Should Do, Could Do, and On Hold from a 24-color curated palette or custom color picker, with options to reset individual or all priorities back to default colors. This feature was kindly suggested by user \'Fae\'.' },
+    { title: '🔄 Dynamic Priority Color Theming Throughout App:', desc: 'Custom priority colors dynamically update across all task sections, modal editors, dropdowns, drag-and-drop hover zones, note priority tags, and restore modals while preserving default colors as the baseline.' }
+  ],
+  '3.8.9': [
+    { title: '✕ Permanent Dismiss for Rescheduled (Deferred 5x) Alert:', desc: 'Added a dedicated dismiss (✕) button to the 5x deferred warning message in both the task editor and task item badge, allowing users to remove the notification for good once acknowledged.' },
+    { title: '📝 Intuitive Mode Toggle Icons (Task Organising & Note Taking):', desc: 'Replaced the confusing microphone toggle icon at the top of the app with a dedicated notebook and pen icon for Notes mode, and updated the Tasks icon to an organized checklist icon depicting clear task management.' }
+  ],
+  '3.8.8': [
+    { title: '📝 Dynamic Subtask Text & Checkbox Scaling in Notes Mode:', desc: 'Subtask checklists, step descriptions, and checkboxes in Notes view mode now dynamically scale with the user\'s Notes Text Size setting in both view and edit modes, ensuring high readability and comfortable touch targets on mobile.' }
+  ],
+  '3.8.7': [
+    { title: '📱 Centered Archive & Undo Notification on Mobile:', desc: 'Fixed bottom horizontal centering for the "Moved to Archive" and task completion Undo snackbar, ensuring it stays perfectly centered on mobile viewports with native safe-area-inset support without clipping off-screen to the right.' },
+    { title: '⚙️ Settings Access in Notes View Mode:', desc: 'Added the Settings icon button into the top action toolbar in Notes view mode right next to the Add Note button, mirroring the top layout in Tasks view for seamless cross-mode configuration.' },
+    { title: '🔍 Expanded Notes Text Size Range (Up to 36pt):', desc: 'Extended the Notes View Text Size slider up to 36pt with dynamic scaling across note card titles, note details, Quick Add, and active note editing textareas for ultra-clear legibility on high-resolution mobile screens.' }
+  ],
+  '3.8.6': [
+    { title: '✨ Smart Natural Language Quick Add (Phase 4):', desc: 'Introduced intelligent natural language parsing in Add Task. Automatically detects due dates (today, tomorrow, friday, in 3 days, 25th Oct), scheduled times (2pm, 14:30, morning, evening), priorities (!1, !2, !3, !4, p1, !must), project hashtags (#Work, #Personal), and recurrence rules (daily, weekly, every 2 weeks, every weekday) with real-time interactive preview chips and 1-tap removal.' },
+    { title: '↩️ Interactive Quick Undo Toast Snackbar:', desc: 'Added a bottom-anchored, 5-second interactive Undo snackbar when tasks are completed or moved to archive. Users can effortlessly reverse accidental actions with 1 tap, elevating confidence especially with touch swipe gestures on mobile.' },
+    { title: '⚡ Power-User Command Palette (Cmd+K / Ctrl+K):', desc: 'Added a spotlight command palette accessible from anywhere via Cmd+K (Mac) or Ctrl+K (Windows/Linux) or via Search. Features keyboard navigation for quick actions, instant mode and theme toggling, project switching, and live global search across all active tasks and notes.' }
+  ],
+  '3.8.5': [
+    { title: '🎛️ Settings Architecture Modularization (Phase 3):', desc: 'Decomposed the monolithic SettingsModal (2,592 lines) into 8 dedicated domain subcomponents (SettingsProjectsTab, SettingsAppearanceTab, SettingsTasksTab, SettingsSwipeTab, SettingsVoiceTab, SettingsShortcutsTab, SettingsSyncTab, SettingsAboutTab) under src/components/modals/settings/.' },
+    { title: '🧪 Comprehensive Critical Modal Test Suites:', desc: 'Added dedicated test suites for SettingsModal, ExportModal, SyncModal, UniversalImportModal, and photoStorage, expanding automated test coverage past 400 unit tests across 48 test suites with 100% pass rate.' }
+  ],
+  '3.8.4': [
+    { title: '🧩 Task Editor Architecture Deduplication (Phase 2):', desc: 'Extracted shared task editing domain logic into modular micro-components (ProjectPicker, PrioritySelector, SchedulePicker, RecurrencePicker, SubtasksEditor) under src/components/tasks/editor/.' },
+    { title: '📉 Codebase Streamlining & Unified Behaviors:', desc: 'Eliminated over 1,740 lines of duplicated code across AddTask and EditModal, standardizing subtask drag-and-drop, circular clock scheduling, external calendar sync, and project picking while ensuring 100% UI consistency and test coverage.' }
+  ],
+  '3.8.3': [
+    { title: '⚡ Zero-Allocation Drag Handlers & Restored Memoization (Phase 1):', desc: 'Refactored drag-and-drop event handlers across TaskItem, PrioritySection, ProjectColumn, and On Hold task lists to pass stable memoized callbacks, eliminating inline closure and object allocations inside .map() loops and restoring full React.memo prop equality.' },
+    { title: '🚀 Progressive Batch Rendering in Archive:', desc: 'Introduced 30-item progressive batch rendering with instant Load More controls in ArchiveModal. Replaced linear project array scans with O(1) indexed Map lookups, enabling instantaneous archive opening even with thousands of completed tasks.' }
+  ],
+  '3.8.2': [
+    { title: '🔐 Dynamic Per-Payload PBKDF2 Salt (SEC-01):', desc: 'Upgraded zero-knowledge end-to-end encryption to generate a unique 16-byte cryptographically random salt per payload, neutralizing rainbow table attacks while preserving 100% backward compatibility for existing encrypted backups.' },
+    { title: '🛡️ Single-Use Device Pairing Codes (SEC-02):', desc: 'Cloudflare Worker now atomically consumes and purges 6-digit device pairing codes immediately upon successful connection, closing the replay window entirely.' },
+    { title: '🔒 Hardened CSP & CORS Policies (SEC-03):', desc: 'Tightened Content Security Policy connect-src directive specifically to the official sync worker domain and restricted Cloudflare Worker CORS headers to authorized application origins.' },
+    { title: '🔑 Cryptographic SHA-256 Admin Authentication (SEC-06):', desc: 'Upgraded admin passcode verification from polynomial hashing to FIPS 180-4 standard SHA-256 with automatic, seamless in-place migration of existing legacy credentials.' }
+  ],
+  '3.8.1': [
+    { title: '⚡ O(N) Project Task Counting & Fast Tabs Rendering (Phase 5):', desc: 'Replaced quadratic nested task counting loops in ProjectTabs with a single memoized O(N) lookup pass and wrapped ProjectTabs in React.memo, eliminating 20+ redundant array traversals on every state change and making project switching instantaneous.' },
+    { title: '🎯 Memoized Task Pipeline & Zero-Allocation Lookups:', desc: 'Memoized active, scheduled, and filtered task pipelines in App.js to eliminate redundant multi-key date/time sorting and search re-filtering during typing. Replaced inline project array allocations with indexed map lookups (O(1)) for On Hold and Scheduled sections.' },
+    { title: '🖐️ Smooth 60fps Drag-and-Drop & UI Control Memoization:', desc: 'Added target ID equality guards to drag-over handlers and stabilized all drag handlers in useCallback to prevent rapid state churn during drag gestures. Wrapped Header, Footer, and SearchBar in React.memo and unified telemetry storage keys into STORAGE_KEYS.' }
+  ],
+  '3.8.0': [
+    { title: '📥 Dedicated Photo Download vs. Share Actions:', desc: 'The Download button in the photo Lightbox viewer now strictly triggers direct file downloads to your Downloads folder on all devices, keeping it distinct from the Share button which opens the system share sheet (AirDrop, Messages, Mail, WhatsApp).' },
+    { title: '⏱️ Extended Download Reliability:', desc: 'Extended file blob download lifetime to ensure smooth, uncorrupted downloads for high-resolution images across all mobile and desktop browsers.' }
+  ],
+  '3.7.59': [
+    { title: '📥 Full-Resolution Photo Download & Native Save:', desc: 'Fixed photo Download in the Lightbox viewer. Desktop users get instant file downloads to their Downloads folder, while mobile users on iOS and Android can 1-tap "Save Image" to their Camera Roll, save to Files, or attach directly to emails.' },
+    { title: '⚡ Cloud Sync Payload Optimization:', desc: 'Cloudflare and Google Drive sync payloads now strictly transmit lightweight metadata and compact thumbnails, keeping background sync fast, data-friendly, and well within Cloudflare Worker limits.' }
+  ],
+  '3.7.58': [
+    { title: '🛡️ Zero Photo Loss & Storage Protection:', desc: 'Note photos are permanently preserved in IndexedDB with browser Persistent Storage protection, completely safeguarding photos from eviction or 5MB quota errors.' },
+    { title: '📦 1-Click Physical Photo ZIP Export:', desc: 'New "Export All Photos (.ZIP)" tool in Data Backup & Settings exports all high-resolution note photos across active and archived tasks into a single physical ZIP file.' },
+    { title: '🖼️ Permanent Photo Retention in Archive:', desc: 'Completed tasks in the Archive now retain their photo attachments and thumbnails, viewable and downloadable anytime in read-only mode.' },
+    { title: '⚡ Asynchronous Thumbnail Hydration:', desc: 'Gallery thumbnails hydrate smoothly from IndexedDB without blocking the UI or causing memory bloat.' }
+  ],
+  '3.7.57': [
+    { title: '📋 Top-Prepend for New Subtasks:', desc: 'When adding new subtasks in Add Task, Edit Task, Task Item, or Notes, newly added steps are now placed immediately at the top of the list for instant visibility and fast multi-step entry.' },
+    { title: '✅ Smart Subtask Auto-Sort on Completion:', desc: 'When a subtask is checked off as completed, it automatically moves to just below the remaining uncompleted subtasks, keeping active items prioritized at the top while maintaining completed items cleanly grouped below.' },
+    { title: '⏎ Multi-Line Carriage Return Support in Task Creation:', desc: 'Fixed Enter / Carriage Return key handling in the Add Task textarea so pressing Return naturally inserts new lines across all mobile keyboards (including OnePlus and Android virtual keyboards) and desktop browsers, allowing itemized list creation. Power users can submit with Cmd+Enter or Ctrl+Enter.' }
+  ],
+  '3.7.56': [
+    { title: '🔄 Unified Subtask Reorder Hook & Modular Architecture (Phase 4):', desc: 'Extracted duplicated touch, boundary collision, and drag-and-drop gesture handlers across TaskItem, AddTask, and EditModal into a reusable useSubtaskReorder hook, eliminating redundant reordering logic and ensuring unified vibration feedback.' },
+    { title: '🗄️ Storage Keys Centralization & Orphan Section Key Pruning:', desc: 'Centralized all local storage identifiers into the STORAGE_KEYS registry, resolving fragmented key usage. Added automated pruning of orphaned task section keys on app startup and task deletion to prevent storage leaks.' },
+    { title: '🛡️ Safe Silent Background Service Worker Activation:', desc: 'Enhanced silent background service worker update transitions to safeguard against reloading while any modal dialog or active input editing is open, safely deferring reloads until the app is backgrounded.' }
+  ],
+  '3.7.55': [
+    { title: '🔒 Security Hardening & Content Security Policy (Phase 3):', desc: 'Introduced strict Content-Security-Policy (CSP) headers restricting script execution, network endpoints, and frame embeddings to authenticated origins.' },
+    { title: '🛡️ Cloudflare Worker Hardening & Dynamic Google GSI Loading:', desc: 'Upgraded device pairing codes to cryptographically secure random values (crypto.getRandomValues) and enforced a 2MB maximum payload limit on cloud sync pushes. Replaced unconditional Google Identity Services script loading with on-demand dynamic script injection only when Google Drive sync is active.' }
+  ],
+  '3.7.54': [
+    { title: '⚡ Performance & Rendering Optimization (Phase 2):', desc: 'Memoized TaskItem, NoteCard, PrioritySection, and ProjectColumn components to eliminate unnecessary re-renders across task and note lists. Replaced linear project lookups with O(1) indexed maps for smoother dragging and list interactions.' },
+    { title: '💾 Granular Storage Persistence & Bounded Photo Caching:', desc: 'Optimized local storage persistence to only synchronize modified state slices instead of re-serializing the entire archive and active datasets on every state change. Added a bounded 25-item LRU cache and persistent connection pooling for IndexedDB photo storage.' }
+  ],
+  '3.7.53': [
+    { title: '⚡ Performance & Bundle Optimization (Phase 1):', desc: 'Introduced intelligent dynamic code-splitting with React.lazy and Suspense for all modal dialogs and secondary views. Cut initial production entry bundle size by 25% (saving ~65kB gzipped) for faster initial app load and snappy responsiveness on mobile devices.' },
+    { title: '🧹 Asset & Storage Streamlining:', desc: 'Purged over 3.5MB of unused legacy assets, duplicate share images, and unreferenced screenshots from repository and build artifacts, streamlining clean deployments.' }
+  ],
+  '3.7.52': [
+    { title: '📋 Streamlined Subtasks & Right-Aligned Completion:', desc: 'Streamlined subtask items across Add Task, Edit Task, Task Item, and Notes. Moved the completed checkbox from the left to replace the old delete button on the right side. Re-isolated and enlarged the drag handle with dedicated touch and selection safeguards so reordering subtasks never accidentally triggers text selection or focus in the text area.' },
+    { title: '🔘 Action Buttons Row Reorganization (Expand & Voice Repositioned):', desc: 'Moved the Expand focus editor and Voice (Talk) dictation buttons from the top of the task description title down to the far right of the unified action buttons line (alongside Notes, Subtasks, and Schedule) with generous spacing.' },
+    { title: '🏷️ Evidentiary Stamp Icon for Notes Timestamps:', desc: 'Updated the "+ Timestamp" button icon in task notes and the full-screen focus editor to a crisp official stamp icon, replacing the clock face for greater clarity.' },
+    { title: '✍️ Dynamic Notes Placeholder on Focus:', desc: 'The holding placeholder text in the notes entry box now vanishes cleanly as soon as the user clicks or focuses into the text field, providing an uncluttered writing space.' }
+  ],
+  '3.7.51': [
+    { title: '✨ Streamlined Add Task Controls & Space Optimization:', desc: 'Removed the redundant Cancel button from the bottom priority button row in the Add Task form, reclaiming valuable horizontal space for priority tier buttons and the Add Task action. Task creation can still be cleanly cancelled at any time via the prominent close cross (✕) in the top right or by pressing the Escape key.' }
+  ],
+  '3.7.50': [
+    { title: '👁️ Active Text Viewport Visibility & Cursor Tracking in Notes and Tasks:', desc: 'When editing a note attached to a task or typing task descriptions in Add Task and Edit Task modals, the active cursor and newly added text now remain visible inside the viewport at all times. Resolved mobile and desktop issues where adding text to the end of a long note pushed the editing line outside the visible pane or behind the virtual keyboard.' },
+    { title: '📐 Precision Soft-Wrap Line Measuring & Container Auto-Scroll:', desc: 'Upgraded the internal cursor position tracker with an off-screen typographic measuring mirror that accurately accounts for soft-wrapped sentences without hard returns. Both the internal textarea scroll and the modal container auto-scroll in real time with frame-synchronized alignment during both keyboard typing and voice transcription.' }
+  ],
+  '3.7.49': [
+    { title: '🎙️ Voice Dictation Viewport Visibility & Cursor Tracking:', desc: 'When using voice dictation to insert text at the beginning or middle of a task description or note, newly transcribed text now remains smoothly visible inside the viewing pane instead of forcing the textarea to scroll all the way to the bottom.' },
+    { title: '🔍 Search Results Auto-Expansion & Unified Search Close:', desc: 'When searching for tasks, priority sections (Must Do, Should Do, Could Do, On Hold, and Scheduled) with matching tasks now automatically expand so search results are immediately visible. Streamlined search controls with a single, clear close button on the search bar while keeping the toolbar magnifying glass persistent.' },
+    { title: '❌ Instant Cancel for New Tasks & Notes:', desc: 'Added an intuitive, unambiguous way to cancel or dismiss task and note creation at any point. You can now tap the header close "X" button, the dedicated Cancel button next to ADD / Save, or press the Escape key to cleanly discard pending input.' }
+  ],
+  '3.7.48': [
+    { title: '🏷️ Uniform "On Hold" Section Heading:', desc: 'Standardized the On Hold tasks header in the main task list from "ON HOLD TASKS" to simply "ON HOLD", establishing full visual and typographic uniformity alongside Must Do, Should Do, and Could Do sections.' },
+    { title: '🧹 Streamlined Archive Row Action Buttons:', desc: 'Removed the redundant secondary permanent delete button that appeared alongside the Restore button on each archived task row, preserving the dedicated delete button on the left of each task for a cleaner, uncluttered interface.' }
+  ],
+  '3.7.47': [
+    { title: '🖼️ Clarified Lightbox Actions, Generous Touch Targets & Spacing:', desc: 'Simplified and clarified the photo viewer controls by streamlining the "Save to Photos / Share" button to a clear "Share" button for standard system sharing, with generous 38px touch targets, comfortable 12px spacing between action buttons, and clear interactive feedback badges.' },
+    { title: '💾 Reliable Photo Download & Expansive Desktop Lightbox View:', desc: 'Fixed the photo Download button to reliably export full-resolution images across all desktop and mobile browsers via Blob URLs and IndexedDB hydration. Also resolved images displaying small on desktop monitors by expanding the Lightbox container to up to 1400px wide with aspect-ratio-preserving viewport fitting, and bumped preview thumbnail generation to 480px for sharp previews on high-DPI displays.' }
+  ],
+  '3.7.46': [
+    { title: '⏱️ Inline Time Lozenge Wrapping & Clean Section Headings:', desc: 'When a scheduled time is set on a task, the time lozenge is now rendered inline with the task description, allowing text lines to cleanly wrap directly underneath the lozenge to eliminate awkward gaps and maximize usable space. Also standardized priority list headers by removing the redundant "Show" and "Hide" prefixes from On Hold and Scheduled sections for complete visual uniformity.' },
+    { title: '📦 Modernized Archive Listing, 2-Line Clamping & Safe Edit Flow:', desc: 'Refined the Archive modal with modernized theme-consistent styling. Archived tasks are now neatly clamped to 2 lines of description for rapid scanning, and clicking an archived task now presents an intuitive confirmation popup prompting to restore it into the live system before opening it in the task editor.' }
+  ],
+  '3.7.45': [
+    { title: '📸 5 Photo Attachments, Cursor Viewport Scrolling & Collapsible Sections:', desc: 'Increased maximum image attachments per task or note from 3 to 5. Improved task description editing by ensuring the active cursor and lines being edited (including the start of the task) remain smoothly visible in the viewport instead of scrolling out of view. In Task Edit, added persistent collapsible sections for Notes, Subtasks, and Schedule with toggle memory across view and edit sessions, and removed redundant edit icon buttons above the description and notes boxes for direct, frictionless typing.' },
+    { title: '🎙️ Smart Voice Dictation Newlines & Instant Save Commands:', desc: 'When appending transcribed voice dictation to existing tasks or notes, new speech now cleanly begins on a new line automatically unless the cursor is positioned elsewhere. Saying "save task" or "save note" now immediately and reliably persists newly transcribed text and closes the modal.' }
+  ],
+  '3.7.44': [
+    { title: '📅 Concise Calendar Event Titles & Full Details Preservation:', desc: 'When adding scheduled tasks to Google Calendar or Apple Calendar (.ics), the event title is now cleanly formatted to a concise headline (up to 40 characters) on natural word boundaries without trailing ellipses, allowing you to immediately tap and edit or expand the title in your calendar. The complete original task text and any associated task notes are safely preserved in the calendar event description field so no context is ever lost.' }
+  ],
+  '3.7.43': [
+    { title: '📘 First-Time User "Getting Started" Guide & Disappearing Helper:', desc: 'Added an intuitive Getting Started function tailored for first-time visitors that links to the beginner-friendly quick-start guide on the website, addressing core concerns about offline data safety, 1-2-3 priorities, and zero-knowledge device syncing. The Getting Started button in the header and welcome banner automatically disappears once the user begins actively adding, completing, or organizing tasks. Added permanent links to both the Beginner\'s Guide and the new in-depth Feature Mastery Guide in Settings under App & Updates.' }
+  ],
+  '3.7.42': [
+    { title: '🌟 Frictionless First-Time User Experience & 1-2-3 Starter Onboarding:', desc: 'Transformed the initial user experience for first-time visitors by eliminating screen-blocking welcome modals and aggressive installation popups. First-time users now land directly into a clean, inviting workspace with a sleek, non-blocking In-Line Welcome Banner introducing the 1-2-3 methodology. Streamlined default sample tasks down to 3 interactive starter tasks demonstrating the Must Do, Should Do, and Could Do tiers. Softened install prompts with consumer-friendly "Add to Home Screen" language and prevented early pop-up interruptions until users have meaningfully engaged with the app.' }
+  ],
+  '3.7.41': [
+    { title: '🔁 Streamlined Recurrence Icon on Schedule Row & Right-Aligned Add Note:', desc: 'Replaced the textual "Repeat this task" label with a clean Repeat icon toggle, unified directly onto the same line as the schedule time icon to maximize vertical screen space in both Add Task and Edit Task modals. In Notes mode, relocated the Add Note button to the right side of the header bar with generous touch targets for rapid, thumb-friendly note capture.' }
+  ],
+  '3.7.40': [
+    { title: '🕒 Streamlined Timestamp & Time Icons, Optional Creation Timestamp:', desc: 'Replaced textual timestamp buttons in task notes and fullscreen focus editor with a clean Clock icon to match adjacent tool buttons. Streamlined the time adder in Date & Recurrence scheduling with a minimal clock face and plus icon, removing redundant "(optional)" text. Hid the task creation date and time stamp by default for a cleaner, decluttered task editing view, while adding a new "Task Creation Date & Time" toggle in Settings (Tasks & Workflow) for users who prefer displaying creation timestamps.' }
+  ],
+  '3.7.39': [
+    { title: '✨ UI Decluttering, Button Display Mode Setting & Compact Footer:', desc: 'Introduced a cleaner, distraction-free interface by replacing redundant dual icon-and-text labels with streamlined icons by default, spaced with ample touch-safe padding to prevent mis-clicks. Added a new "Feature Buttons & Labels" setting under Appearance & Styling in Settings to toggle between Icons (Clean), Icons & Text, and Text Only across the top bar, task forms, and notes view. Also streamlined the footer by combining the copyright notice and version number into a single compact line.' }
+  ],
+  '3.7.38': [
+    { title: '🏆 Streamlined Footer & Top Bar Achievements:', desc: 'Removed the achievements trophy badge/link from the footer since it is already readily accessible near the top of the lists view in Tasks mode, giving the footer a cleaner, minimal presentation.' }
+  ],
+  '3.7.37': [
+    { title: '🔗 Direct In-Box Actionable Links & Clean Task View:', desc: 'Removed the separate cluttered Actionable section when viewing tasks. Phone numbers, email addresses, and web links are now directly linked and interactive inside the task description and notes boxes. Clicking any link immediately calls, emails, or opens the URL without entering edit mode, while clicking anywhere else in the box or tapping the Edit/Done button smoothly transitions into the full text editor.' }
+  ],
+  '3.7.36': [
+    { title: '⏱️ Concise Scheduled Time Badge at Start of Tasks:', desc: 'Tasks with an associated scheduled time now display a small, concise time badge (e.g. 09:00, 2:30 PM) right at the start of the task in the list view across both Pro and Lite views. Provides an instant daily timeline view while keeping the interface clean and space-efficient.' }
+  ],
+  '3.7.35': [
+    { title: '📊 Complete Active Task Counts in Projects Dropdown:', desc: 'Audited and refined the active task counts displayed in the Projects dropdown trigger and menu. Project badges now accurately reflect all active tasks across Must Do, Should Do, Could Do, On Hold, and Scheduled & Recurring tasks (including future scheduled dates).' }
+  ],
+  '3.7.34': [
+    { title: '📐 Full-Width Real-Estate for On Hold & Scheduled Tasks:', desc: 'Removed the heavy grey box border, background fill, and recessed padding from the On Hold and Scheduled & Recurring task lists. Tasks now render full-width edge-to-edge seamlessly matching the primary priority sections, maximizing visible screen real-estate while maintaining clean collapsible headers with chevron indicators and drop-target responsiveness.' }
+  ],
+  '3.7.33': [
+    { title: '⏱️ Chronological Time Ordering & Time Visibility Setting:', desc: 'Tasks with a scheduled time now automatically appear in chronological time order with the earliest time first, allowing 123ToDo to function like a daily calendar schedule while fully preserving custom drag-and-drop manual reordering. Added a new "Scheduled Task Times" toggle in Settings (Tasks & Workflow) to easily show or hide time selectors and time badges for an even simpler, distraction-free interface.' }
+  ],
+  '3.7.32': [
+    { title: '🕒 Universal Custom Circular Clock Face Time Picker:', desc: 'Introduced a unified, custom circular clock face time picker across desktop and mobile. Features an intuitive two-step interactive clock dial (hours then minutes), digital time display with direct hour/minute switching, AM/PM toggle, and dial-tap selection for a seamless, consistent experience on all platforms.' }
+  ],
+  '3.7.31': [
+    { title: '✨ Clean Priority Section Headers:', desc: 'Removed the redundant "Collapsed" text label from priority section headers in the main task list. Sections maintain clean, uncluttered visual headers with intuitive chevron toggle icons indicating collapse and expansion states.' }
+  ],
+  '3.7.30': [
+    { title: '⏰ Simple Clock Face Time Picker:', desc: 'Simplified the scheduling time picker to a clean, minimal interface. Clicking the time input opens the intuitive native clock face to easily pick the hour then minutes, eliminating visual clutter while preserving quick Google Calendar and Apple Calendar integration.' }
+  ],
+  '3.7.29': [
+    { title: '⚡ Fast 1-Tap Time Presets & Clean Dropdown Picker:', desc: 'Upgraded the time picker to make scheduling tasks effortless on both mobile and desktop. Added 1-tap quick preset chips for Morning (09:00), Midday (12:00), Afternoon (14:00), and Evening (18:00), alongside a clean common times dropdown and exact time input, while seamlessly retaining calendar integration.' }
+  ],
+  '3.7.28': [
+    { title: '📅 Google & Apple Calendar Integration & Automated Reminders:', desc: 'Added seamless 1-click "Add to Google Calendar" and "Add to Apple Calendar" (.ics) buttons when scheduling tasks, pre-configured with reminders. Also introduced automated in-app and PWA reminders for due scheduled tasks on desktop and mobile devices, with a preference toggle in Settings.' }
+  ],
+  '3.7.27': [
+    { title: '⏰ Optional Time for Scheduled Tasks:', desc: 'Added an optional scheduled time alongside the scheduled date. Designed to be visually minimalist and unobtrusive so it does not clutter the interface for users who only schedule by date, with a subtle "+ Add time" option, clear controls, and chronological date and time ordering.' }
+  ],
+  '3.7.26': [
+    { title: '🖐️ Drag-and-Drop Reordering for Due Scheduled Tasks:', desc: 'Scheduled tasks continue to appear at the top of their priority list when their set due date arrives, but now fully respect custom drag-and-drop reordering without snapping back to the top, allowing users to freely move them anywhere in the list or place other tasks above them.' }
+  ],
+  '3.7.25': [
+    { title: '📝 Streamlined & Clutter-Free Notes View:', desc: 'Simplified the Notes view header by removing the achievements badge and settings cog (accessible anytime in Tasks view), neatly aligning the red new note icon on the header row next to projects, and eliminating the redundant Add New Note button below for a cleaner, distraction-free writing experience.' }
+  ],
+  '3.7.24': [
+    { title: '🎙️ Continuous Voice Dictation & Word Repetition Elimination:', desc: 'Resolved speech transcription word duplication and engine stutters during continuous dictation. Added intelligent multi-word and single-word deduplication, seamless interim segment boundary overlap merging, and clean pause recovery across all Talk buttons in Tasks and Notes modes.' }
+  ],
+  '3.7.23': [
+    { title: '🔝 Top Priority Placement for Scheduled Tasks Due Today:', desc: 'When a scheduled task reaches its set day (or is due today), it is now automatically placed at the top of its priority list, ensuring it is immediately visible and never overlooked even in long lists.' }
+  ],
+  '3.7.22': [
+    { title: '📅 Chronological Scheduled Tasks Sorting:', desc: 'Scheduled and recurring tasks in the Scheduled section are now automatically sorted in ascending date order with tasks due the soonest displayed at the top of the list.' }
+  ],
+  '3.7.21': [
+    { title: '🏢 Commercial White-Labeling & Multi-Tenant Branding (Phase 1):', desc: 'Introduced an extensible configuration architecture allowing custom branded editions for commercial clients while preserving seamless core app updates for everyone. Supports custom partner footer branding, partner logos, client-specific support/portal links, and client feature flags with instant activation via URL (?brand=pilot) and device persistence.' }
+  ],
+  '3.7.20': [
+    { title: '🎨 Styled Projects Dropdown in Notes Mode:', desc: 'Upgraded the Notes view project dropdown to match the custom styled dropdown in Tasks mode, featuring vibrant project color borders, colored indicator bands, accurate note counts, and active highlighting.' }
+  ],
+  '3.7.19': [
+    { title: '✨ Streamlined Notes Toolbar:', desc: 'Removed the redundant Pro/Lite toggle switch from the Notes view toolbar to match Tasks mode. Interface Profile selection remains fully available and configurable under Settings > Appearance.' }
+  ],
+  '3.7.18': [
+    { title: '🎙️ Clean Voice Dictation & Echo Prevention:', desc: 'Resolved speech recognition text duplication across pauses in Notes mode. Cleaned up recognition instance recycling during natural pauses and pauses between sentences, preventing repeated words, duplicated sentences, and overlapping speech buffers.' }
+  ],
+  '3.7.17': [
+    { title: '🔄 Drag-and-Drop Reordering for On Hold Tasks:', desc: 'Added full drag-and-drop support to the On Hold tasks section. Users can now reorder tasks within the On Hold section as well as drag tasks into and out of On Hold from any priority tier or project column with responsive visual drop indicators.' }
+  ],
+  '3.7.16': [
+    { title: '✨ Streamlined Main List Toolbar:', desc: 'Removed the Pro/Lite interface toggle switch from the main task list toolbar, freeing up valuable space for project names and essential action buttons on smaller mobile screens. Interface Profile selection remains fully available and configurable under Settings > Appearance.' }
+  ],
+  '3.7.15': [
+    { title: '🔄 Restored Drag-and-Drop Task Reordering in Lite Mode:', desc: 'Restored draggable handlers and reordering capability across tasks in Lite mode. Users can seamlessly click and drag tasks to reorder them within or between priority sections and project columns in both Lite and Pro interface profiles, with safeguards ensuring smooth drops without unintended edit modal triggers.' }
+  ],
+  '3.7.14': [
+    { title: '📱 Adaptive Resolution & Compact Phone Scaling:', desc: 'Added automatic device screen resolution and viewport detection. For older and compact phones (such as iPhone SE, iPhone 5/6/7/8, Galaxy A-series, and screens ≤375px or ≤640px high), the app automatically adjusts base typography, header logo width, modal paddings, and touch targets to maintain optimal proportion and eliminate cramped layouts. Includes a manual override in Settings > Appearance (Auto, Compact, Standard).' }
+  ],
+  '3.7.13': [
+    { title: '🛡️ Safe & Clean Lite Notes View:', desc: 'Removed the expand chevron icon adjacent to the archive checkbox in Lite notes view to eliminate accidental completions. Users can effortlessly expand and view full note details and edit mode by clicking directly on the note card or text.' }
+  ],
+  '3.7.12': [
+    { title: '🛡️ Safe & Clean Lite Tasks View:', desc: 'Removed the expand chevron icon adjacent to the archive checkbox in Lite tasks view to prevent accidental taps. Users can effortlessly view and edit complete task details and subtasks by clicking directly on the task item to open the full edit modal.' }
+  ],
+  '3.7.11': [
+    { title: '🔒 Truthful & Evidentiary Timestamps Integrity:', desc: 'Audited timestamp handling across tasks, notes, and archives. Removed legacy fallback to IDs to eliminate false or ancient timestamps (e.g. 1970). Tasks and notes created prior to timestamp tracking strictly omit timestamp badges unless a genuine creation date was recorded. Added strict validation ensuring only truthful, modern timestamps are formatted and displayed.' }
+  ],
+  '3.7.10': [
+    { title: '🎯 Unified Expanded Edit Card Across Views:', desc: 'Clicking any task in Lite view now directly launches the exact same full Pro Task Edit Card as Pro view, providing identical editing capabilities, voice dictation, priority selectors, subtasks checklist, notes editor, and date scheduling across both modes. Tapping the expand chevron reveals the full in-card Pro layout.' }
+  ],
+  '3.7.9': [
+    { title: '✨ Enhanced Pro Details & Seamless Toggle in Lite Mode:', desc: 'In Tasks mode Lite view, clicking any task card or expand button now seamlessly expands it to reveal complete Pro details (priority badge with color indicator, project badge, scheduled/due date with recurrence, full description, interactive subtasks checklist, notes, and photos). Clicking anywhere on an expanded task toggles collapse back to 2 lines, while clicking the title or Edit Details directly launches the full Pro Edit Modal.' }
+  ],
+  '3.7.8': [
+    { title: '🔍 Full Pro Details in Lite View & Footer Achievements Badge:', desc: 'In Tasks mode Lite view, clicking any task now expands it to reveal complete Pro details (project tag, full unclamped text, schedule and recurrence, subtasks checklist, full notes, and photo attachments). Cleaned the Lite toolbar by hiding the achievements badge, and added the achievements badge next to the version number in the footer for instant access in both Pro and Lite modes.' }
+  ],
+  '3.7.7': [
+    { title: '🍃 Streamlined Lite Mode & Layout Harmonization:', desc: 'Restored the full-size header logo and moved the Pro/Lite toggle to the action toolbar between the Projects dropdown and Achievements badge. In Lite mode, tasks and notes now display up to 2 lines of description only with zero metadata clutter, retaining the archive checkbox. Clicking any card expands it with full Pro-level details. Notes mode now starts with a clean notes timeline and an Add New Note button.' }
+  ],
+  '3.7.6': [
+    { title: '🍃 Dual Interface Profiles (Pro / Lite):', desc: 'Introduced a persistent Pro / Lite view toggle for both Tasks and Notes modes. In Lite mode (default for new users), Tasks present a distraction-free 2-line view with Must Do front and center, and Notes display in a clean 2-line timeline with 1-click progressive disclosure to expand full details.' }
+  ],
+  '3.7.5': [
+    { title: '🔄 Automated Master Changelog Sync:', desc: 'Integrated automatic synchronization between in-app release notes, repository CHANGELOG.md, and the public marketing website changelog during the build process.' }
+  ],
+  '3.7.4': [
+    { title: '📜 Public Web Changelog & Master Version History:', desc: 'Added direct access to the complete, unbroken release changelog from v1.0.0 to present on 123todo.com and in-repo CHANGELOG.md.' }
+  ],
+  '3.7.3': [
+    { title: '🔝 Top-Level Version Info Modal & Close Button:', desc: 'Elevated the Latest Update Info modal to always display on top of Settings with dedicated Close buttons (top-right X and bottom button), and expanded release history to display the last 5 versions.' }
+  ],
+  '3.7.2': [
+    { title: '📢 Social Share Call-to-Action:', desc: 'Updated the lowest footer social sharing section with a clearer call-to-action: "Share this App and keep it FREE!".' }
+  ],
+  '3.7.1': [
+    { title: '🔄 Silent Background Updates:', desc: 'App updates now install automatically and silently in the background without intrusive update bars or interruption to your work.' },
+    { title: '⚙️ Compact Settings Sync & Version History:', desc: 'Moved the sync status indicator into Settings with a clean, compact design, and added a Latest Update Info modal in App & Updates to view recent release highlights.' }
+  ],
+  '3.7.0': [
+    { title: '🕒 1-Click Timestamped Notes & Updates:', desc: 'Added a 1-click + Timestamp button in the task notes editor (and full-screen focus overlay). Automatically appends the current date & time so you can maintain progressive activity logs, phone call updates, and running client journals without clunky multi-note bloat.' },
+    { title: '📅 Visible Creation Timestamps in Task Edit:', desc: 'Displays the exact evidentiary date and time when the task or note was originally created at the bottom of the edit modal, matching evidentiary logs in Notes mode.' },
+    { title: '📐 Harmonized Top Bar Spacing & Compact Footer:', desc: 'Standardized top bar button spacing to a uniform 12px grid with 32px circular touch targets, and streamlined the footer by removing redundant import/export buttons to maximize vertical task viewing space.' }
+  ],
+  '3.6.21': [
+    { title: '🎙️ Continuous Voice Dictation & Pause Resilience:', desc: 'Resolved premature 4-second dictation cutoffs. Enabled true continuous recognition across Mac and mobile devices with seamless auto-restart across natural thinking pauses, keeping the mic active until you tap to finish.' }
+  ],
+  '3.6.20': [
+    { title: '🎯 Task-Style Archive Checkbox in Notes Mode:', desc: 'Moved the archive checkbox to the top-right header on each note card with smooth square-to-check animation and 300ms completion delay, identical to Task mode.' },
+    { title: '🎨 Cohesive Notes Mode Iconography:', desc: 'Aligned priority flag icons, subtask checklist icons, and circular 32px header action buttons across Notes mode for visual consistency.' }
+  ],
+  '3.6.19': [
+    { title: '⏱️ Configurable Notes Auto-Save Delay:', desc: 'Balanced 1-minute (60s) real-world default delay for on-site measuring and quoting, with customizable tiers (30s, 1m, 2m, 5m, or manual) in Settings > Tasks & Workflow.' }
+  ],
+  '3.6.18': [
+    { title: '⚡ Redesigned Fast Notes Mode:', desc: 'Prominent Save button at the top right alongside Talk button, single note field with "Add New Note..." placeholder, photo attachments at the note-taking stage, and discard protection.' }
+  ],
+  '3.6.17': [
+    { title: '📲 Streamlined PWA Experience:', desc: 'Intelligent frequency for install prompts based on active app usage without disruptive footer links.' }
+  ],
+  '3.6.16': [
+    { title: '📝 Simplified Notes Editing:', desc: 'Dynamically hides empty note details fields during quick note editing, reserving full view for notes that contain text.' }
+  ],
+  '3.6.15': [
+    { title: '🛡️ Brand & Copy Modernization:', desc: 'Refined app wording and terms to support ongoing feature enhancements.' }
+  ],
+  '3.6.14': [
+    { title: '📸 Human-Friendly Photo Names & Zero-Bleed Lightbox:', desc: 'Transformed long machine-generated photo filenames into clean, human-friendly titles and eliminated action bar bleed in the photo Lightbox.' }
+  ],
+  '3.6.13': [
+    { title: '👋 Streamlined Welcome Modal:', desc: 'App-first onboarding with clean collapsible accordion drawers for how to install, features, and privacy without overwhelming walls of text.' }
+  ],
+  '3.6.12': [
+    { title: '⚡ Fast Notes Mode & Top Save Buttons:', desc: 'Redesigned Notes mode for lightning-fast capture. Added prominent, large Save Note buttons right at the top of both Quick Add and Note Edit cards, alongside Cmd+Enter keyboard shortcut support.' },
+    { title: '📅 Bottom Evidentiary Timestamps & 1-Tap Copy:', desc: 'Added full date and time timestamps at the bottom of all note and task cards with a 1-tap Copy Evidence button for official job logs, client proof, and invoices.' },
+    { title: '📸 Native Phone Photo Export & Capture Evidence:', desc: 'Added 1-tap Save to Photos / Share via native Web Share API so iPhone and Android users can save photos directly to their Apple Photos Camera Roll, plus exact capture timestamps in the Lightbox.' }
+  ],
+  '3.6.11': [
+    { title: '⚙️ Reorganized Settings Hub:', desc: 'Restructured Settings into 8 intuitive, priority-ordered tabs (Appearance, Tasks, Projects, Swipe, Cloud Sync, Voice, Shortcuts, App & Updates) for lightning-fast configuration.' },
+    { title: '📋 Dedicated Tasks & Workflow Preferences:', desc: 'Grouped list view modes (compact vs full-length), date formats, character limits, and preferred email clients into a dedicated Tasks settings panel.' },
+    { title: '🎙️ Dedicated Voice Dictation Guide:', desc: 'Created an uncluttered, standalone reference for speech-to-text, device-tailored voice features, punctuation, and editing commands.' },
+    { title: '📦 Consolidated App & Updates Center:', desc: 'Unified the version checker, 1-click PWA installer, and platform installation guides into an all-in-one App & Updates section.' }
+  ],
+  '3.6.10': [
+    { title: '⏩ Sleek Professional Schedule Controls:', desc: 'Replaced calendar icons and full text with streamlined FastForward quick-schedule buttons (Day & Week), providing cleaner visual hierarchy and extra breathing room in Add and Edit task panels.' },
+    { title: '🔗 Unified Actionable Entity Detection:', desc: 'Consolidated detected phone numbers, email addresses, and URLs into a single, clean actionable item panel beneath tasks in Edit and Add modes.' },
+    { title: '📦 Quick-Access Task Edit Archiving:', desc: 'Added an instant Archive button right beside the Close button in the Task Edit header for power users.' }
+  ],
+  '3.6.9': [
+    { title: '🎙️ Clean Zero-Drop Mobile Voice Capture & Desktop Continuous Dictation:', desc: 'Tailored dictation by device: zero-drop clean phrase capture on mobile phones (stopping operating-system bleep loops and audio interruptions), unbroken continuous dictation across thinking pauses on desktop computers, and integrated guidance for native keyboard dictation.' }
+  ],
+  '3.6.8': [
+    { title: '🎙️ Continuous Natural Dictation Across Thinking Pauses:', desc: 'Refined speech recognition engine to seamlessly remain listening across 2-3 second thinking pauses (up to 20 seconds of silence) without cutting off or requiring you to tap the record button again.' }
+  ],
+  '3.6.7': [
+    { title: '🎙️ Reliable Mobile Dictation without Chime Interruptions:', desc: 'Prevented audio interruption cycles and hardware chime loops on mobile phones when speech ends, ensuring words are captured completely without dropping spoken text during system tones.' }
+  ],
+  '3.6.6': [
+    { title: '🎙️ Continuous Voice Dictation & Natural Pauses:', desc: 'Enabled true continuous recognition and an extended 20-second pause window so your phone mic stays open and listening through your thoughts without cutting out or chiming off prematurely.' },
+    { title: '🔤 Natural Spoken Editing & Letter-by-Letter Spelling:', desc: 'Refined deletion commands ("delete last 2 words", "delete last sentence") and added intuitive spelling commands ("spell out...", "letter by letter...") for unusual names and words.' }
+  ],
+  '3.6.5': [
+    { title: '🎙️ User-Friendly Mobile Voice Dictation:', desc: 'Eliminated aggressive auto-restart loops on mobile phones, stopping repeated system confirmation beeps and chimes during natural speech pauses.' },
+    { title: '🔴 Clear Visual Recording Indicators:', desc: 'Replaced confusing muted/strikethrough mic icons with live glowing recording indicators, clear "Listening... (Tap to finish)" tooltips, and reassuring captured feedback.' }
+  ],
+  '3.6.4': [
+    { title: '📁 Full Project List in Task Edit:', desc: 'Task Edit modal dynamically elevates overflow when opening the projects dropdown, ensuring the complete project list displays without being cut off by the modal dialog boundary.' },
+    { title: '📅 Single-Row Schedule Controls in Task Edit:', desc: 'Auto-sized scheduled date picker and aligned Next Day and Next Week quick buttons onto a single neat row without line-wrapping.' }
+  ],
+  '3.6.3': [
+    { title: '🎨 Spectrum Project Palette & Auto-Migration:', desc: 'Reorganized project color palette into a 20-color natural spectrum across 2 lines of 10, avoiding master priority colors, with seamless auto-migration for existing projects and tasks.' },
+    { title: '📅 Single-Row Schedule Date Controls:', desc: 'Optimized date picker width in Add Task and aligned Next Day and Next Week quick-schedule buttons onto a single neat row.' },
+    { title: '📁 Full-Height Project Dropdown in Add Task:', desc: 'Expanded Add Task projects dropdown to display full project list cleanly above the blurred background without container clipping.' }
+  ],
+  '3.6.2': [
+    { title: '✉️ Preferred Email Service Picker:', desc: 'Clicking an actionable email link now prompts you to choose your preferred email app or web service (Apple Mail / System, Gmail, Outlook.com, or Yahoo Mail). It remembers your choice once and can be changed anytime in Settings.' }
+  ],
+  '3.6.1': [
+    { title: '📞 Actionable Email Addresses & Phone Numbers:', desc: 'Email addresses (mailto:) and phone numbers (tel:) in tasks, task notes, and notes are now automatically actionable and clickable on all devices with direct dialing, emailing, and browsing.' },
+    { title: '📲 PWA Installation Guide & Awareness:', desc: 'Added dedicated Progressive Web App (PWA) installation guide modal with device auto-detection (iOS, Android, Desktop), 1-click install prompt support, and a comprehensive beginner guide article.' }
+  ],
+  '3.6.0': [
+    { title: '📸 Photo Attachments in Notes & Tasks:', desc: 'Attach up to 3 photos or screenshots per note! Features native camera capture on mobile, file upload, drag-and-drop, direct clipboard pasting (Cmd+V / Ctrl+V) for screen grabs, ultra-fast client-side compression to preserve crisp receipts and 4K text, local IndexedDB caching, and a full-screen Lightbox viewer with zoom.' },
+    { title: '🖐️ Smooth Drag-and-Drop Task Reordering:', desc: 'Eliminated drag-and-drop snapback issues with stabilized pointer tracking and immediate local state settlement.' },
+    { title: '📱 Responsive Project Name Line-Wrapping:', desc: 'Long project names now wrap smoothly on mobile and compact desktop windows, ensuring the Add Task button and settings icons remain perfectly aligned and fully visible.' },
+    { title: '🔒 Enhanced Session & Setting Persistence:', desc: 'Core app preferences and user session settings now persist safely across version upgrades.' },
+    { title: '🎙️ Clean Voice Dictation & Redesigned Note Controls:', desc: 'Resolved dictation sentence duplication, moved the bold Voice button to the right, renamed Focus Editor to Expand, and collapsed notes on recurring and scheduled tasks by default for a decluttered view.' }
+  ],
+  '3.5.2': [
+    { title: '🛡️ Sync Engine Startup Guard & Efficiency:', desc: 'Sync checks on launch and background polling now only run for your actively selected sync engine, ensuring zero unwanted Google Drive checks when syncing via Cloud Sync (Cloudflare / VPS).' },
+    { title: '📡 Dynamic Provider-Aware Offline Alerts:', desc: 'Offline status notifications now dynamically detect and display your chosen sync engine (Cloud Sync or Google Drive).' },
+    { title: '🖐️ Enhanced Swipe Action Range & Damping:', desc: 'Refined swipe gestures with extended travel range and smoother gesture triggers to prevent accidental action cancellation during rapid list management.' },
+    { title: '📂 Expanded Project Dropdown Selectors:', desc: 'Significantly widened project selectors in Add Task and Edit Modal views with dynamic viewport height bounds for long project lists.' },
+    { title: '🛡️ Project Deletion Safety Spacing:', desc: 'Separated confirmation and delete buttons in project management settings to prevent accidental project removal.' }
+  ],
+  '3.5.1': [
+    { title: '🎨 10-Tier Level Roadmap & Color-Coded Progress Ladder:', desc: 'Added an interactive progression guide in the Achievements Hub detailing all 10 ranks from Focused Starter to 123 Immortal, complete with custom color themes, level descriptions, and point requirements.' },
+    { title: '📖 Featured Streaks & Milestones Blog Guide:', desc: 'Linked our comprehensive illustrated guide on "The Psychology of Productivity Streaks & Milestones" directly from the Achievements Hub.' }
+  ],
+  '3.5.0': [
+    { title: '🏆 Productivity Achievements & Stats Hub:', desc: 'Added an achievement trophy badge in the header opening a house-styled modal with 10-tier level progression, Productivity Points, 6-card productivity insights, daily streaks, 1-2-3 rule balance ratios, and unlockable milestone badges.' },
+    { title: '↕️ Subtasks Line Wrapping & Drag-and-Drop Reordering:', desc: 'Checklist subtasks now automatically wrap lines onto multiple rows and can be rearranged via drag-and-drop handles across Add Task, Edit Modal, and Task List views.' },
+    { title: '🔍 Space-Efficient Note Preview:', desc: 'Tasks with notes now display a clean, single-line preview of the note directly underneath the task title for quick scanning without eating screen real estate.' },
+    { title: '🎨 Add Task Project Dropdown Styling:', desc: 'Restyled project selector in the Add Task form with project color pills, clean borders, and matching elevated dropdown popovers.' },
+    { title: '📚 123todo.com Knowledge & Blog Hub:', desc: 'Embedded direct links in the Achievements hub to official 123todo.com blog articles covering time management, micro-steps, and daily habit consistency.' }
+  ],
+  '3.4.2': [
+    { title: '⚡ Accelerated Background Sync Intervals:', desc: 'Enhanced background polling speed across standard adaptive sync tiers: 30s for default background sync, 60s for moderate editing, and 120s for heavy usage.' }
+  ],
+  '3.4.1': [
+    { title: '🖐️ Drag-and-Drop Project Preservation Fix:', desc: 'Fixed task reordering logic to preserve task project assignments when dragging and dropping tasks to new positions in priority lists.' },
+    { title: '⚡ Cloudflare Sync Optimization & Adaptive Rate Budgeting:', desc: 'Optimized cloud sync request volume with conditional pulls, automatic CORS caching, and intelligent client-side adaptive rate budgeting that protects battery, bandwidth, and zero-cost quotas.' }
+  ],
+  '3.4.0': [
+    { title: '📊 Project Columns View in Wide Mode:', desc: 'Added a new setting option to view wide-screen Kanban columns grouped by Projects instead of Priorities, with horizontal scrolling and full browser width expansion.' },
+    { title: '🖐️ Precision Drag-and-Drop Drop Line Alignment:', desc: 'Fixed task insertion position during drag-and-drop to align precisely with the target drop indicator line.' }
+  ],
+  '3.3.3': [
+    { title: '📝 Real-Time Textarea Auto-Expansion & Dictation Viewport Scroll:', desc: 'Removed restrictive height caps across all Notes mode textareas, enabling unlimited dynamic height expansion and smooth viewport auto-scrolling so newly spoken lines remain 100% visible at all times.' }
+  ],
+  '3.3.2': [
+    { title: '🎙️ Voice Command Refinements & Expanded Focus Modal:', desc: 'Refined voice dictation punctuation processing, enhanced "add note" and "add task" voice submission sensitivity, aligned On Hold tasks list layout, and expanded focus editor overlay modal to maximum viewport size.' }
+  ],
+  '3.3.1': [
+    { title: '🔒 Dual-Engine Encrypted Cloud Sync & Documentation Update:', desc: 'Expanded sync documentation covering 123ToDo Zero-Knowledge Cloud Sync (Cloudflare D1 E2EE) alongside Google Drive AppData Sync, and published switching & migration guides.' }
+  ],
+  '3.3.0': [
+    { title: '🔄 Multi-Competitor Migration Wizard & 1-Click Import from Other Apps:', desc: 'Introduced a unified "Import from Other Apps" wizard supporting seamless data migration from Todoist, TickTick, Google Keep, Google Tasks, and Microsoft To Do with zero text truncation and multi-file drag-and-drop support.' }
+  ],
+  '3.2.0': [
+    { title: '🌐 Multi-Platform Social Sharing & Native Graphic Image Share:', desc: 'Added social share links for Reddit, Telegram, Threads, Bluesky, and Pinterest alongside X, WhatsApp, Facebook, LinkedIn, and Email, enabled native device image file sharing via Web Share API, and deployed a custom 1200x630 123 ToDo preview card.' }
+  ],
+  '3.1.6': [
+    { title: '📝 14pt Tasks Default, Task-First Notes & Inline Subtask Editing:', desc: 'Bumped default Tasks mode text size to 14pt with responsive button layout scaling, routed Notes View entry directly to Task text field with Must Do (P1) priority, added inline subtask text editing across all views, and fixed completion checkbox archiving.' }
+  ],
+  '3.1.5': [
+    { title: '⚡ Multi-Stage Search Auto-Focus:', desc: 'Enhanced search input auto-focus with multi-stage timers (0ms, 50ms, 150ms) ensuring the cursor immediately focuses inside the text box across all mobile and desktop browsers.' }
+  ],
+  '3.1.4': [
+    { title: '🎯 Instant Search Input Auto-Focus:', desc: 'Tapping the search magnifying glass icon in either Tasks or Notes mode automatically focuses the expanded search text box and places the cursor inside for instant typing.' }
+  ],
+  '3.1.3': [
+    { title: '🔍 Search Bar Collapse & Unstacked Single-Row Header Layout:', desc: 'Clicking X on the expanded Search bar now clears search query and collapses the bar back to magnifying glass only, and guaranteed non-stacking single row header layout in Notes view.' }
+  ],
+  '3.1.2': [
+    { title: '🎨 Notes Control Bar Layout & Settings Label Formatting:', desc: 'Aligned Search icon, Projects dropdown, and Settings icon on the exact same row in order, and updated Notes View Text Size settings label formatting to (Default), (Smaller), or (Larger).' }
+  ],
+  '3.1.1': [
+    { title: '📱 Mobile Header & Expanding Search Bar:', desc: 'Fixed mobile header layout overflow with responsive logo scaling, larger switcher font size (15px), expandable search icon toggle in Notes view matching Tasks view, and "Add New Note" placeholder.' }
+  ],
+  '3.1.0': [
+    { title: '🛡️ Safe Note Archiving & Multi-Field Search:', desc: 'Removed direct card deletion icon to prevent accidental data loss (items are safely archived via completion), enabled full multi-field search across titles and notes in Tasks view, added Settings cog to Notes view, and introduced independent Notes View text size scaling.' }
+  ],
+  '3.0.2': [
+    { title: '🎨 Header & Notes Layout Refinements:', desc: 'Removed duplicated header Add Task button, single-row Search and Project Filter dropdown alignment, Add Note holding placeholder text, expanded button spacing for glove-friendly use, and renamed card action button to "Priority".' }
+  ],
+  '3.0.1': [
+    { title: '🎙️ Voice Notes UI Refinements & Bug Fixes:', desc: 'Deeper mode toggle buttons, relocated + Add Task button to subheader, red tape-recorder Talk dictation button, simplified single note entry, and descending chronological note ordering.' }
+  ],
+  '3.0.0': [
+    { title: '🎙️ Dual Skin Operating System & Simple Voice Notes Mode:', desc: 'Introduced a second skin for 123 ToDo! Switch between structured Task Manager Mode (P1-P4 matrix) and Simple Voice Notes Mode featuring extra large builder-friendly text, hands-free continuous dictation, unassigned inbox capture, deferred project assignment, and 1-tap task conversion — all backed by the same unified dataset and zero-knowledge sync engine.' }
+  ],
+  '2.9.0': [
+    { title: '📂 Collapsible Priority Sections & Streamlined Toolbar Controls:', desc: 'Added expand/contract toggles with state persistence to priority sections, provider-agnostic Synced status indicator, collapsible notes for scheduled tasks, and streamlined Edit Task modal controls.' }
+  ],
+  '2.8.0': [
+    { title: '🔒 123ToDo Set & Forget Cloud Sync & Dual Provider Engine:', desc: 'Introduced 123ToDo Cloud Sync powered by Cloudflare D1 Serverless E2E Zero-Knowledge Encryption (AES-256-GCM). Eliminates 1-hour Google OAuth drops, fully supports iOS Safari PWAs, and adds 5-second 6-digit device pairing.' }
+  ],
+  '2.7.4': [
+    { title: '🎙️ Advanced Voice Commands & Auto-Scroll Viewport Tracking:', desc: 'Hands-free task creation ("add task"), live spoken deletion ("delete last word", "scratch that", "clear all"), real-time auto-scroll tracking, steady Google Sync indicator dot, and a Voice-to-Text guide in Settings.' }
+  ],
+  '2.7.3': [
+    { title: '🎙️ Spoken Voice Commands & Dictation Settings Guide:', desc: 'Added spoken deletion commands ("delete last word", "scratch that", "clear all"), hands-free auto-submission when saying "add task", and a detailed Voice-to-Text guide in Settings.' }
+  ],
+  '2.7.2': [
+    { title: '🏆 Minimalist Milestone Congratulations Modal:', desc: 'Redesigned the task completion milestone modal to align perfectly with the clean, modern aesthetic of the application, featuring theme variables, Framer Motion entry animations, and sharp stat cards.' }
+  ],
+  '2.7.1': [
+    { title: '📜 Live Dictation Auto-Scroll & Viewport Tracking:', desc: 'Added auto-expanding height and scrollTop tracking so newly spoken words/lines are always clearly visible at the bottom of the input canvas during voice dictation.' }
+  ],
+  '2.7.0': [
+    { title: '🟢 Refined Google Sync Status Indicator:', desc: 'Kept Google Drive Sync button text and background completely steady during sync operations, adding a pulsing green status dot to indicate active background syncing smoothly.' }
+  ],
+  '2.6.9': [
+    { title: '🔘 Unified Action Toolbar in Edit Modal:', desc: 'Aligned Notes, Subtasks, and Schedule toggle buttons onto a single flex row when editing tasks, matching the Add Task layout.' }
+  ],
+  '2.6.8': [
+    { title: '🎙️ Smart Voice Transcript Deduplication:', desc: 'Added word-level suffix and prefix overlap detection algorithm (mergeBaseAndTranscript) to guarantee zero text duplication across all voice dictation sessions.' }
+  ],
+  '2.6.7': [
+    { title: '📝 Compact Empty Notes & Refined Selector Styling:', desc: 'Compacted empty Notes field to a clean toggle button when editing tasks, and removed background color fills from Priority & Project dropdown triggers and options.' }
+  ],
+  '2.6.6': [
+    { title: '🎙️ Voice Input Fix & Selective Character Count:', desc: 'Fixed text duplication when dictating via voice, and hidden character count indicators when Unlimited Characters mode is enabled.' }
+  ],
+  '2.6.5': [
+    { title: '🎨 Color-Coded Priority & Project Selectors:', desc: 'Enhanced Edit Modal dropdowns with custom color-coded indicators, priority dot badges, and project accent color bands.' }
+  ],
+  '2.6.4': [
+    { title: '📐 Significantly Expanded Modal Viewing Canvas:', desc: 'Expanded in-modal textarea height up to 480px and widened edit modal container to 580px when Expand mode is activated.' }
+  ],
+  '2.6.3': [
+    { title: '📏 Expanded Task Text Width:', desc: 'Reduced check box padding and right action margins to maximize horizontal text space on each task item.' }
+  ],
+  '2.6.2': [
+    { title: '🔍 Expanded Focus & Notes Editor:', desc: 'Added inline height expansion controls and a spacious full-screen Focus Canvas Overlay with word, character, and line count metrics for reviewing and editing large task descriptions and notes.' }
+  ],
+  '2.6.1': [
+    { title: '📝 Task Text Editing & Todoist Import Fix:', desc: 'Fixed character limit blocking when editing imported or long tasks, ensuring full text editing freedom without browser input locks.' }
+  ],
+  '2.6.0': [
+    { title: '✨ 123 ToDo v2.6.0 Milestone Release:', desc: 'Major release featuring refined compact task layouts, 440px redesigned Edit/Note Modal, 1-click Next Week scheduling, drag-and-drop & completion persistence fixes, default Muted theme, full-height Projects menu, and glassmorphic update notifications.' }
+  ],
+  '2.5.32': [
+    { title: '📁 Full-Height Projects Dropdown:', desc: 'Expanded the main Projects dropdown popup to display all projects down to the last item without forced scrollbars.' }
+  ],
+  '2.5.31': [
+    { title: '✨ Refined Update Notification Card:', desc: 'Redesigned the new version update prompt into a clean, glassmorphic card with Framer Motion entry animations and subtle accent typography.' }
+  ],
+  '2.5.30': [
+    { title: '🎨 Default Muted Light Theme:', desc: 'Set Muted tone (Subdued Cozy Grey with Zero Glare) as the default light theme mode for new users.' }
+  ],
+  '2.5.29': [
+    { title: '✅ Task Completion Persistence & Sync Conflict Fix:', desc: 'Fixed active vs archived conflict resolution during dataset merges and unmount cleanup in task completion timer so completed tasks never re-appear in active lists.' }
+  ],
+  '2.5.28': [
+    { title: '🔤 Standard Font Weight Adjustment:', desc: 'Adjusted standard font weight to regular 400 for crisp, non-bold text when Bold Typography mode is disabled.' }
+  ],
+  '2.5.27': [
+    { title: '📅 Quick "Next Week" Scheduling Button:', desc: 'Added 1-click "Next Week" quick scheduling buttons across Edit Modal, Add Task, and Quick Defer controls.' }
+  ],
+  '2.5.26': [
+    { title: '🖐️ Drag-and-Drop & Task Edit Persistence Fix:', desc: 'Fixed downward task reordering index calculations, task updatedAt timestamp tracking, and LocalStorage state synchronization dependencies.' },
+    { title: '📝 Refined Edit & Note Modal Layout:', desc: 'Redesigned the edit modal with a compact 440px width, Priority and Project selectors above title, and Notes directly below title.' }
+  ],
+  '2.5.25': [
+    { title: '⚡ Cache-Busted PWA Update Engine:', desc: 'Added direct cache-busted version checking via version.json so desktops and mobiles never get stuck on stale cached PWA builds.' }
+  ],
+  '2.5.24': [
+    { title: '🖐️ Smooth Drag & Drop Drop Position Fix:', desc: 'Aligned task reordering insertion to target drop indicator line and disabled Framer Motion layout spring-back interference.' }
+  ],
+  '2.5.23': [
+    { title: '🖐️ Cross-Priority Drag & Drop Fix:', desc: 'Fixed a type-coercion bug in task ID comparisons during HTML5 drag and drop, ensuring tasks stay locked in place after reordering across priorities.' }
+  ],
+  '2.5.22': [
+    { title: '⚡ App Health & Silent Error Tracking:', desc: 'Added 100% anonymous browser error and sync drop monitoring to detect friction in the wild.' },
+    { title: '🛠️ Feature Adoption Metrics:', desc: 'Added privacy-preserving feature adoption metrics for Voice Dictation, Cloud Sync, Todoist Imports, and Search.' }
+  ],
+  '2.5.21': [
+    { title: '💻 OS Platform Breakdown:', desc: 'Added 100% privacy-preserving OS & platform classification (macOS, iOS, Windows, Android, Linux).' },
+    { title: '🌐 Geographic Region Breakdown:', desc: 'Added privacy-safe approximate region metrics (United Kingdom, Europe, North America, Australasia, Asia).' }
+  ],
+  '2.5.20': [
+    { title: '⏱️ Active Session Usage Tracking:', desc: 'Added 100% privacy-preserving active usage session time tracking (heartbeat active minutes while app is in focus).' },
+    { title: '✅ Aggregate Task Completion Counter:', desc: 'Added privacy-safe aggregate task completion count metric.' }
+  ],
+  '2.5.19': [
+    { title: '⚡ Deployment Trigger Optimization:', desc: 'Optimized GitHub Actions automated deployment workflow trigger for seamless VPS deployments.' }
+  ],
+  '2.5.18': [
+    { title: '⚙️ VPS Deployment Automation Fix:', desc: 'Refreshed deployment trigger sequence to guarantee clean VPS container builds.' }
+  ],
+  '2.5.17': [
+    { title: '🛡️ 100% Privacy-Preserving Telemetry:', desc: 'Zero cookies used, no IP addresses or personal data logged, fully GDPR/CCPA compliant out of the box.' }
+  ],
+  '2.5.16': [
+    { title: '🛡️ Archive Deletion 2-Stage Approval:', desc: 'Added prominent visual warning banner and 2-step confirmation buttons before clearing archived tasks.' },
+    { title: '🖐️ Drag & Drop Task Reordering:', desc: 'Restored smooth HTML5 drag-and-drop task reordering across list sections and On Hold tasks.' },
+    { title: '📌 Top Placement for New Tasks:', desc: 'Newly created tasks now automatically appear at the top of their respective item list section.' },
+    { title: '🧹 Todoist CSV Import Metadata Filter:', desc: 'Automatically filters out Todoist CSV export metadata rows (such as view_style=list).' },
+    { title: '📊 Projects Dropdown Task Badges:', desc: 'Displays active task count badges (e.g. All (12), Work (5)) in the projects drop-down selector and option list.' },
+    { title: '🎨 Configurable Light Mode Tones:', desc: 'Introduced 3 light mode background tones (Bright, Soft, Muted) under Settings ➔ Appearance to reduce eye strain.' },
+    { title: '📐 Streamlined Task List Layout:', desc: 'Removed leading + note toggle symbol button to save space and enhance task list appearance.' }
+  ],
+  '2.5.15': [
+    { title: '📐 Open Archive Range-Left Alignment:', desc: 'Aligned Open Archive section button range-left to match On Hold and Scheduled headings.' }
+  ],
+  '2.5.14': [
+    { title: '🎯 Task Drag & Drop Position Persistence Fix:', desc: 'Guarantees custom reordered task positions stay permanently saved during 2-way background Google Drive sync.' }
+  ],
+  '2.5.13': [
+    { title: '📐 Single-Row Header Bar Alignment:', desc: 'Search icon, project dropdown (dynamically sized to project text), and Settings cog are now cleanly aligned on a single row.' }
+  ],
+  '2.5.12': [
+    { title: '🗑️ Archive Deletion 2-Way Sync Fix:', desc: 'Guarantees deleted items from the Archive remain permanently deleted across all connected devices during 2-way Google Drive sync.' }
+  ],
+  '2.5.11': [
+    { title: '📦 Simplified Archive Trigger:', desc: 'Shortened archive button label to "Open Archive" for a cleaner visual layout.' },
+    { title: '📐 Refined Header Typography:', desc: 'Reduced section header font size on Archive, Scheduled, and On Hold titles for clean visual proportions.' }
+  ],
+  '2.5.10': [
+    { title: '🗑️ Project Deletion Sync Fix:', desc: 'Guarantees deleted custom projects remain permanently deleted across all connected devices during 2-way Google Drive sync.' }
+  ],
+  '2.5.9': [
+    { title: '🔤 Font Settings Persistence:', desc: 'Guarantees text size and typography settings remain saved across page reloads and version updates.' },
+    { title: '📦 Full-Screen Archive Search:', desc: 'Spacious full-screen Archive modal with instant keyword search, project filters, and sorting.' },
+    { title: '🔄 Sync Restoration Fix:', desc: 'Restored tasks stay active permanently across devices without falling back into the Archive.' }
+  ],
+  '2.5.8': [
+    { title: '🔒 Pull-to-Refresh Gesture Lock:', desc: 'Prevents vertical pull-to-refresh motions from accidentally triggering swipe-to-archive task actions.' },
+    { title: '📦 Complete Archive Visibility:', desc: 'Guarantees that all archived tasks are stored and rendered reliably in the Archive section.' }
+  ],
+  '2.5.7': [
+    { title: '🗑️ Project Deletion Overlay Fix:', desc: 'Fixed Delete Project confirmation modal layer so deletion prompts render cleanly on top of Settings.' },
+    { title: '📐 Header Bar Space Optimization:', desc: 'Streamlined the projects bar by placing search icon directly next to the project selector.' }
+  ],
+  '2.5.6': [
+    { title: '🔤 Bold Text Typography Setting:', desc: 'Added a Bold Text checkbox under Settings ➔ Appearance for high-contrast typography.' },
+    { title: '📐 Compact View Spacing Refinement:', desc: 'New default compact density for new users with extra padding between text rows and divider lines.' },
+    { title: '💻 System Default Theme Mode:', desc: 'Theme Mode defaults to System preference automatically for new users.' }
+  ],
+  '2.5.5': [
+    { title: '✍️ Spoken Punctuation Recognition:', desc: 'Speak "full stop", "comma", "question mark", "exclamation mark", "colon", "semi colon", or "new line" to insert punctuation naturally.' },
+    { title: '🛡️ Overwrite-Proof Voice Buffer:', desc: 'Uses a locked speech buffer so pauses or thinking breaks never overwrite or delete previously spoken text.' }
+  ],
+  '2.5.4': [
+    { title: '🎙️ Voice Task & Notes Dictation:', desc: 'Tap the Voice button on task titles or notes to speak naturally. Speech automatically appends to text so you can pause to think.' },
+    { title: '🔄 Seamless 2-Way Multi-Device Sync:', desc: 'Guarantees that new tasks or projects added offline across multiple devices are merged seamlessly without data loss.' },
+    { title: '📏 Custom Task Description Length:', desc: 'Set your preferred task description length under Settings ➔ Appearance (250 characters default or Unlimited).' }
+  ],
+  '2.5.3': [
+    { title: '🎙️ Voice Notes Dictation:', desc: 'Dictate long descriptions, instructions, or links directly into the task Notes section using voice.' },
+    { title: '🔄 Continuous Speech & Appending:', desc: 'Speech recognition automatically appends newly spoken words to existing text so pauses while thinking won\'t cut you off.' },
+    { title: '⭐ Streamlined Voice Task Creation:', desc: 'All voice tasks automatically default to Top Priority (P1) and your selected project for effortless 1-tap task entry.' }
+  ],
+  '2.5.2': [
+    { title: '🔄 Seamless 2-Way Multi-Device Sync:', desc: 'Guarantees that new tasks or projects added offline across multiple devices (e.g. laptop & phone) are merged seamlessly without data loss.' },
+    { title: '🛡️ Data Preservation Engine:', desc: 'Prevents sync overwrites so tasks created offline on one device are merged into all connected devices.' }
+  ],
+  '2.5.1': [
+    { title: '🎙️ Voice Task Input (Speech-to-Task):', desc: 'Tap the Voice button to speak tasks naturally with automatic priority and project detection.' },
+    { title: '⚡ Smart Natural Language Parsing:', desc: 'Automatically parses priority (P1-P4) and project keywords from spoken phrases, defaulting to Priority 1 (Must Do).' },
+    { title: '💡 Voice Command Guidance:', desc: 'Interactive voice command examples and tips available under Settings ➔ Appearance.' }
+  ],
+  '2.5.0': [
+    { title: '📏 Custom Task Description Length:', desc: 'Set your preferred task description length under Settings ➔ Appearance (250 characters default or Unlimited).' },
+    { title: '👈 Compact Swipe Reveal Visuals:', desc: 'Sleeker, faster visual swipe reveal hints that appear immediately upon starting a swipe gesture.' },
+    { title: '✨ Streamlined Task Notes UI:', desc: 'Optimized Notes field layout for a clean, distraction-free editing experience.' }
+  ],
+  '2.4.17': [
+    { title: '👉 Todoist-Style Swipe Gestures:', desc: 'Dual-stage visual feedback with solid color fills, spring action icons, and physical rubber-band damping.' },
+    { title: '📅 Date Format Order Preference:', desc: 'Choose UK (DD/MM/YYYY), US (MM/DD/YYYY), ISO (YYYY-MM-DD), or Short Text date styles under Settings ➔ Appearance.' },
+    { title: '🔄 Prominent Check for Updates:', desc: '1-click update checks in the main app footer and Settings title bar for desktop and mobile.' },
+    { title: '✨ Streamlined Notes UI:', desc: 'Cleaned up placeholder text and character counters for a distraction-free, spacious editing experience.' }
+  ],
+  '2.4.16': [
+    { title: '📖 Todoist Migration Guide:', desc: 'Interactive step-by-step export & import guide modal linked directly from import dialogs.' },
+    { title: '🔍 Complete SEO Overhaul:', desc: 'Schema.org JSON-LD structured data, high-intent titles, meta descriptions, and search indexing optimizations.' },
+    { title: '📝 Unlimited Notes & Subtask Guidance:', desc: 'Refined User Guide and landing page copy highlighting subtask checklists and unlimited notes.' },
+    { title: '🐛 Modernized Help & Troubleshooting:', desc: 'Updated troubleshooting guide with Google Drive sync, Shadow Backup recovery, and PWA updates.' }
+  ],
+  '2.4.15': [
+    { title: '🔄 Manual Update Check:', desc: 'Check for updates anytime under Settings ➔ Appearance.' },
+    { title: '🖐️ Drag & Drop Projects:', desc: 'Reorder your projects by dragging grip handles in Settings.' },
+    { title: '🔔 Sync Alert Popup:', desc: 'Automatic prompt if Google Drive session disconnects so you can re-auth in 1 tap.' },
+    { title: '📐 Compact Layout:', desc: 'Optimized project selector dropdown and trimmed header/footer margins.' }
+  ],
+  '2.4.14': [
+    { title: '🔄 Manual Update Check:', desc: 'Check for updates anytime under Settings ➔ Appearance.' },
+    { title: '🖐️ Drag & Drop Projects:', desc: 'Reorder your projects by dragging grip handles in Settings.' },
+    { title: '🔔 Sync Alert Popup:', desc: 'Automatic prompt if Google Drive session disconnects so you can re-auth in 1 tap.' },
+    { title: '📐 Compact Layout:', desc: 'Optimized project selector dropdown and trimmed header/footer margins.' }
+  ],
+  '2.4.13': [
+    { title: '🖐️ Drag & Drop Projects:', desc: 'Reorder your projects by dragging grip handles in Settings.' },
+    { title: '🔔 Sync Alert Popup:', desc: 'Automatic prompt if Google Drive session disconnects so you can re-auth in 1 tap.' },
+    { title: '📐 Compact Layout:', desc: 'Optimized project selector dropdown and trimmed header/footer margins.' }
+  ]
+};

@@ -1,0 +1,406 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { encryptData, decryptData } from '../utils/crypto';
+import { mergeSyncDatasets } from '../utils/syncUtils';
+
+let gsiLoadingPromise = null;
+
+export const loadGoogleGsiScript = () => {
+    if (typeof window === 'undefined') return Promise.resolve(false);
+    if (window.google && window.google.accounts) return Promise.resolve(true);
+    if (gsiLoadingPromise) return gsiLoadingPromise;
+
+    gsiLoadingPromise = new Promise((resolve) => {
+        const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+        if (existing) {
+            if (window.google && window.google.accounts) {
+                resolve(true);
+                return;
+            }
+            existing.addEventListener('load', () => resolve(true), { once: true });
+            existing.addEventListener('error', () => {
+                gsiLoadingPromise = null;
+                resolve(false);
+            }, { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve(true);
+        script.onerror = () => {
+            console.warn('Failed to load Google Identity Services script');
+            gsiLoadingPromise = null;
+            resolve(false);
+        };
+        document.head.appendChild(script);
+    });
+
+    return gsiLoadingPromise;
+};
+
+// The Client ID from the Google Cloud Console
+const CLIENT_ID = '831861694055-fco4oka90dc7npbglscjad0prqpeu2oh.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+const SYNC_FILE_NAME = '123todo_sync.json';
+
+export const useGoogleDriveSync = (localData, importDataCallback, enabled = true) => {
+    const [isAuthed, setIsAuthed] = useState(false);
+    const [syncStatus, setSyncStatus] = useState('offline'); // 'offline', 'syncing', 'synced', 'error'
+    const [isSyncDropped, setIsSyncDropped] = useState(false);
+    const [isOffline, setIsOffline] = useState(!navigator.onLine);
+    const [passphrase, setPassphrase] = useState(localStorage.getItem('123Todo_Sync_Passphrase') || '');
+    const accessTokenRef = useRef(null);
+    const tokenClientRef = useRef(null);
+    const syncFileIdRef = useRef(null);
+    const isSyncingRef = useRef(false);
+
+    // Save passphrase to local storage so we don't ask every time
+    useEffect(() => {
+        if (passphrase) {
+            localStorage.setItem('123Todo_Sync_Passphrase', passphrase);
+        } else {
+            localStorage.removeItem('123Todo_Sync_Passphrase');
+        }
+    }, [passphrase]);
+
+    const localDataRef = useRef(localData);
+    useEffect(() => {
+        localDataRef.current = localData;
+    }, [localData]);
+
+    const handleTokenExpired = useCallback(() => {
+        console.warn('Google Access Token expired or invalid.');
+        localStorage.removeItem('123Todo_Google_AccessToken');
+        localStorage.removeItem('123Todo_Google_TokenExpiry');
+        accessTokenRef.current = null;
+        setIsAuthed(false);
+        setSyncStatus('offline');
+        if (localStorage.getItem('123Todo_Google_Authed') === 'true') {
+            setIsSyncDropped(true);
+        }
+    }, []);
+
+    const performSync = useCallback(async (isInitial = false, isUserAction = false) => {
+        if (!enabled || !accessTokenRef.current || !passphrase || isSyncingRef.current) return;
+
+        isSyncingRef.current = true;
+        if (isInitial || isUserAction) {
+            setSyncStatus('syncing');
+        }
+        try {
+            const headers = { 'Authorization': `Bearer ${accessTokenRef.current}` };
+            
+            // 1. Check if the file exists on Drive, fetching metadata description as the JS timestamp
+            const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${SYNC_FILE_NAME}'&fields=files(id, modifiedTime, description)`, { headers });
+            if (searchRes.status === 401) {
+                handleTokenExpired();
+                return;
+            }
+            const searchData = await searchRes.json();
+            
+            const remoteFile = searchData.files && searchData.files.length > 0 ? searchData.files[0] : null;
+            if (remoteFile) {
+                syncFileIdRef.current = remoteFile.id;
+            }
+
+            const currentLocalData = localDataRef.current;
+            const localTimestamp = currentLocalData.timestamp || 0;
+
+            const uploadSyncFile = async (base64Payload, fileId = null) => {
+                setSyncStatus('syncing');
+                const metadata = { 
+                    name: SYNC_FILE_NAME,
+                    description: localTimestamp.toString() // Store exact local JS timestamp in metadata
+                };
+                if (!fileId) {
+                    metadata.parents = ['appDataFolder'];
+                }
+                const fileContent = JSON.stringify({ payload: base64Payload });
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', new Blob([fileContent], { type: 'application/json' }));
+
+                let url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime,description';
+                let method = 'POST';
+                if (fileId) {
+                    url = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&fields=id,modifiedTime,description`;
+                    method = 'PATCH';
+                }
+
+                const res = await fetch(url, { method, headers, body: form });
+                if (res.status === 401) {
+                    handleTokenExpired();
+                    return;
+                }
+                if (!res.ok) throw new Error('Upload failed: ' + await res.text());
+                return await res.json();
+            };
+
+            const downloadSyncFile = async (fileId) => {
+                setSyncStatus('syncing');
+                const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers });
+                if (res.status === 401) {
+                    handleTokenExpired();
+                    return;
+                }
+                if (!res.ok) throw new Error('Download failed');
+                return await res.json();
+            };
+
+            if (remoteFile) {
+                const fileData = await downloadSyncFile(remoteFile.id);
+                if (!fileData) return; // 401 handled
+                if (fileData && fileData.payload) {
+                    const decrypted = await decryptData(fileData.payload, passphrase);
+                    
+                    // 2-Way Merge local dataset and remote Google Drive dataset
+                    const mergedData = mergeSyncDatasets(currentLocalData, decrypted);
+                    
+                    // Apply merged dataset to local application state
+                    importDataCallback(mergedData);
+                    
+                    // Re-encrypt and update Google Drive with the merged dataset so all devices stay in sync
+                    const encrypted = await encryptData(mergedData, passphrase);
+                    const updatedFile = await uploadSyncFile(encrypted, remoteFile.id);
+                    if (updatedFile) {
+                        syncFileIdRef.current = updatedFile.id;
+                    }
+                }
+            } else {
+                // No remote file exists yet: upload current local data as initial cloud sync file
+                const encrypted = await encryptData(currentLocalData, passphrase);
+                const updatedFile = await uploadSyncFile(encrypted, null);
+                if (updatedFile) {
+                    syncFileIdRef.current = updatedFile.id;
+                }
+            }
+            
+            setSyncStatus('synced');
+        } catch (error) {
+            console.error('Sync failed:', error);
+            if (!navigator.onLine) {
+                setIsOffline(true);
+                setSyncStatus('offline');
+            } else {
+                setSyncStatus('error');
+            }
+        } finally {
+            isSyncingRef.current = false;
+        }
+    }, [passphrase, importDataCallback, handleTokenExpired, enabled]);
+
+    // Initialize Google Identity Services token client
+    const initGoogleClient = useCallback(() => {
+        if (!window.google || !window.google.accounts) return;
+
+        // First, check if we have a valid stored token. If so, use it immediately!
+        const storedToken = localStorage.getItem('123Todo_Google_AccessToken');
+        const storedExpiry = localStorage.getItem('123Todo_Google_TokenExpiry');
+        let hasValidToken = false;
+
+        if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry, 10)) {
+            accessTokenRef.current = storedToken;
+            setIsAuthed(true);
+            hasValidToken = true;
+            // Trigger an initial pull/sync only when enabled
+            if (enabled) {
+                performSync(true);
+            }
+        }
+
+        tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (tokenResponse) => {
+                if (tokenResponse.error !== undefined) {
+                    console.error('Google Auth Error:', tokenResponse);
+                    setIsAuthed(false);
+                    localStorage.removeItem('123Todo_Google_AccessToken');
+                    localStorage.removeItem('123Todo_Google_TokenExpiry');
+                    if (localStorage.getItem('123Todo_Google_Authed') === 'true') {
+                        setIsSyncDropped(true);
+                    }
+                    if (tokenResponse.type === 'tokenFailed') {
+                        localStorage.removeItem('123Todo_Google_Authed');
+                    }
+                    return;
+                }
+                accessTokenRef.current = tokenResponse.access_token;
+                setIsAuthed(true);
+                setIsSyncDropped(false);
+                localStorage.setItem('123Todo_Google_Authed', 'true');
+                // Store the token and expiry (expires_in is in seconds, e.g. 3600)
+                const expiryTime = Date.now() + (parseInt(tokenResponse.expires_in, 10) || 3600) * 1000;
+                localStorage.setItem('123Todo_Google_AccessToken', tokenResponse.access_token);
+                localStorage.setItem('123Todo_Google_TokenExpiry', expiryTime.toString());
+                // Trigger an initial pull/sync only when enabled
+                if (enabled) {
+                    performSync(true);
+                }
+            },
+        });
+
+        // Attempt silent automatic token refresh only if Google Drive sync is enabled AND user previously signed in AND token is expired
+        if (enabled && !hasValidToken && localStorage.getItem('123Todo_Google_Authed') === 'true') {
+            try {
+                // prompt: 'none' requests token silently in background without displaying any popup/UI
+                tokenClientRef.current.requestAccessToken({ prompt: 'none' });
+            } catch (err) {
+                console.warn('Silent token refresh failed:', err);
+                setIsAuthed(false);
+                setSyncStatus('offline');
+                setIsSyncDropped(true);
+            }
+        } else if (!hasValidToken) {
+            setIsAuthed(false);
+            setSyncStatus('offline');
+        }
+    }, [enabled, performSync]);
+
+    // Initialize Google Identity Services only when Google Drive sync is enabled or user previously authorized
+    useEffect(() => {
+        const isPreviouslyAuthed = localStorage.getItem('123Todo_Google_Authed') === 'true';
+        if (!enabled && !isPreviouslyAuthed) {
+            return;
+        }
+
+        let isMounted = true;
+        loadGoogleGsiScript().then((loaded) => {
+            if (isMounted && loaded) {
+                initGoogleClient();
+            }
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [enabled, initGoogleClient]);
+
+    const signIn = useCallback(async () => {
+        if (!tokenClientRef.current) {
+            const loaded = await loadGoogleGsiScript();
+            if (loaded) {
+                initGoogleClient();
+            }
+        }
+        if (tokenClientRef.current) {
+            tokenClientRef.current.requestAccessToken();
+        }
+    }, [initGoogleClient]);
+
+    const signOut = useCallback(() => {
+        if (accessTokenRef.current && window.google) {
+            window.google.accounts.oauth2.revoke(accessTokenRef.current, () => {
+                console.log('Access token revoked');
+            });
+        }
+        accessTokenRef.current = null;
+        setIsAuthed(false);
+        setIsSyncDropped(false);
+        setSyncStatus('offline');
+        setPassphrase('');
+        localStorage.removeItem('123Todo_Google_Authed');
+        localStorage.removeItem('123Todo_Google_AccessToken');
+        localStorage.removeItem('123Todo_Google_TokenExpiry');
+        syncFileIdRef.current = null;
+    }, []);
+
+    const dismissSyncDropped = useCallback(() => {
+        setIsSyncDropped(false);
+    }, []);
+
+    // Setup an effect to auto-sync when local data changes (with debounce)
+    useEffect(() => {
+        if (enabled && isAuthed && passphrase) {
+            const timeoutId = setTimeout(() => {
+                performSync(false);
+            }, 300); // 300ms debounce for immediate push
+            return () => clearTimeout(timeoutId);
+        }
+    }, [localData.timestamp, isAuthed, passphrase, performSync, enabled]);
+
+    // Smart Sync: Focus, Pointer, Network Reconnect & 4s Active Polling
+    useEffect(() => {
+        if (!enabled || !isAuthed || !passphrase) return;
+
+        let intervalId;
+
+        const startPolling = () => {
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(() => {
+                // Only poll lightweight metadata if tab is visible
+                if (document.visibilityState === 'visible') {
+                    performSync(false);
+                }
+            }, 25000); // 25 seconds background polling for polite, silent cloud checks
+        };
+        startPolling();
+
+        const handleFocusOrVisible = () => {
+            if (document.visibilityState === 'visible') {
+                performSync(false);
+                startPolling(); // Reset timer
+            }
+        };
+
+        // Mobile touch end listener to flush sync immediately when finger lifts on mobile
+        let touchTimeoutId;
+        const handleTouchEnd = () => {
+            if (document.visibilityState === 'visible') {
+                if (touchTimeoutId) clearTimeout(touchTimeoutId);
+                touchTimeoutId = setTimeout(() => {
+                    performSync(false);
+                }, 50); // 50ms instant flush on mobile touch release
+            }
+        };
+
+        const handleOffline = () => {
+            console.warn('Network connection offline.');
+            setIsOffline(true);
+            setSyncStatus('offline');
+        };
+
+        const handleOnline = () => {
+            console.log('Network connection restored.');
+            setIsOffline(false);
+            if (isAuthed && passphrase) {
+                performSync(false);
+            }
+        };
+
+        window.addEventListener('focus', handleFocusOrVisible);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        window.addEventListener('pointerenter', handleFocusOrVisible);
+        window.addEventListener('touchend', handleTouchEnd, { passive: true });
+        window.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+        document.addEventListener('visibilitychange', handleFocusOrVisible);
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+            if (touchTimeoutId) clearTimeout(touchTimeoutId);
+            window.removeEventListener('focus', handleFocusOrVisible);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('pointerenter', handleFocusOrVisible);
+            window.removeEventListener('touchend', handleTouchEnd);
+            window.removeEventListener('touchcancel', handleTouchEnd);
+            document.removeEventListener('visibilitychange', handleFocusOrVisible);
+        };
+    }, [enabled, isAuthed, passphrase, performSync]);
+
+    return {
+        isAuthed,
+        syncStatus,
+        isSyncDropped,
+        isOffline,
+        dismissSyncDropped,
+        passphrase,
+        setPassphrase,
+        signIn,
+        signOut,
+        performSync
+    };
+};

@@ -1,0 +1,945 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { STORAGE_KEYS, DEFAULT_PROJECTS, migrateProjectColor } from '../utils/constants';
+import { calculateNextRecurrenceDate, getTodayDateString, isValidEvidentiaryTimestamp, promoteDueScheduledTasks, insertTaskInTimeOrder } from '../utils/dateUtils';
+import { savePhotos, requestPersistentStorage } from '../utils/photoStorage';
+import { getMaxProjects } from '../utils/booster';
+
+// Lightweight serializer for LocalStorage: keeps metadata and compact thumbnails in LocalStorage,
+// ensuring the heavy multi-megabyte dataUrl strings stay in IndexedDB to prevent QuotaExceededErrors.
+// If localStorage quota is ever under pressure, stripThumbnail can strip thumbnails to pure metadata.
+export const sanitizeTasksForStorage = (taskList, stripThumbnail = false) => {
+    if (!Array.isArray(taskList)) return [];
+    return taskList.map(task => {
+        if (!task) return null;
+        if (!task.photos || !Array.isArray(task.photos) || task.photos.length === 0) {
+            return task;
+        }
+        const lightweightPhotos = task.photos.map(p => {
+            if (!p) return p;
+            if (stripThumbnail) {
+                const { dataUrl, thumbnail, ...rest } = p;
+                return rest;
+            }
+            const { dataUrl, ...rest } = p;
+            return rest;
+        });
+        return { ...task, photos: lightweightPhotos };
+    }).filter(Boolean);
+};
+
+// Sanitizes task lists to resolve any duplicate task IDs or missing IDs,
+// ensuring every task has a unique integer ID and the counter is correct.
+const sanitizeTaskIds = (tasksList, archivedList, startCounter) => {
+    const usedIds = new Set();
+    let maxId = startCounter;
+
+    // Find the maximum ID used in either list to ensure auto-generated IDs do not collide
+    const findMaxId = (list) => {
+        (list || []).forEach(t => {
+            if (t && typeof t.id === 'number' && t.id > maxId) {
+                maxId = t.id;
+            }
+        });
+    };
+    findMaxId(tasksList);
+    findMaxId(archivedList);
+
+    let currentCounter = maxId;
+
+    const sanitizeList = (list) => {
+        return (list || []).map(task => {
+            if (!task) return null;
+            let id = task.id;
+            if (id === undefined || id === null || usedIds.has(id)) {
+                currentCounter++;
+                id = currentCounter;
+            } else {
+                usedIds.add(id);
+            }
+            return {
+                ...task,
+                id,
+                projectId: task.projectId || task.categoryId || 'general',
+                scheduledDate: task.scheduledDate || null,
+                scheduledTime: task.scheduledTime || null,
+                promotedDate: task.promotedDate || null,
+                deferCount: task.deferCount || 0,
+                deferAlertDismissed: task.deferAlertDismissed || false,
+                subtasks: task.subtasks || [],
+                isRecurring: task.isRecurring || false,
+                recurrence: task.recurrence || null
+            };
+        }).filter(Boolean);
+    };
+
+    const sanitizedTasks = sanitizeList(tasksList);
+    const sanitizedArchived = sanitizeList(archivedList);
+
+    return {
+        tasks: sanitizedTasks,
+        archived: sanitizedArchived,
+        counter: currentCounter
+    };
+};
+
+export const useTasks = () => {
+    const [tasks, setTasks] = useState([]);
+    const [archived, setArchived] = useState([]);
+    const [projects, setProjects] = useState([]);
+    const [deletedProjects, setDeletedProjects] = useState(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEYS.DELETED_PROJECTS);
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+    const [deletedTaskKeys, setDeletedTaskKeys] = useState(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEYS.DELETED_TASKS);
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+    const [counter, setCounter] = useState(0);
+    const [timestamp, setTimestamp] = useState(Date.now());
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    const prevTasksRef = useRef();
+    const prevArchivedRef = useRef();
+    const prevProjectsRef = useRef();
+    const prevDeletedProjectsRef = useRef();
+    const prevDeletedTasksRef = useRef();
+    const prevCounterRef = useRef();
+    const prevTimestampRef = useRef();
+
+    const initializeSampleTasks = useCallback(() => {
+        const userDataKeys = Object.keys(localStorage).filter(key =>
+            key.startsWith('123Todo') &&
+            !key.includes('Milestones') &&
+            !key.includes('InstallDismissed') &&
+            !key.includes('LastInstallPrompt')
+        );
+
+        if (userDataKeys.length === 0) {
+            const sampleTasks = [
+                { id: 1, text: "🎯 Tap the checkmark to mark this task complete", priority: 1, isSample: true, projectId: 'general' },
+                { id: 2, text: "✏️ Tap here to replace this with your own top priority today", priority: 2, isSample: true, projectId: 'general' },
+                { id: 3, text: "➕ Tap the + button below to add another task", priority: 3, isSample: true, projectId: 'general' }
+            ];
+            setTasks(sampleTasks);
+            setCounter(3);
+        }
+    }, []);
+
+    // Load data from localStorage on mount
+    useEffect(() => {
+        try {
+            const savedTasks = localStorage.getItem(STORAGE_KEYS.TASKS);
+            const savedArchived = localStorage.getItem(STORAGE_KEYS.ARCHIVE);
+            let savedProjects = localStorage.getItem(STORAGE_KEYS.PROJECTS);
+            const savedCounter = localStorage.getItem(STORAGE_KEYS.COUNTER);
+
+            // Legacy migration: support reading from 123TodoCategories if 123TodoProjects doesn't exist yet
+            if (!savedProjects) {
+                const legacyCategories = localStorage.getItem('123TodoCategories');
+                if (legacyCategories) {
+                    savedProjects = legacyCategories;
+                    localStorage.setItem(STORAGE_KEYS.PROJECTS, legacyCategories);
+                    localStorage.removeItem('123TodoCategories');
+                    console.log('🔄 Migrated legacy categories to projects in LocalStorage');
+                }
+            }
+
+            let loadedTasks = [];
+            if (savedTasks) {
+                const parsed = JSON.parse(savedTasks);
+                // MIGRATION: Ensure every task has a projectId, support fallback from legacy categoryId
+                loadedTasks = parsed.map(t => {
+                    const item = { ...t, projectId: t.projectId || t.categoryId || 'general' };
+                    if (item.projectColor) item.projectColor = migrateProjectColor(item.projectColor);
+                    if (item.color) item.color = migrateProjectColor(item.color);
+                    if (item.createdAt && !isValidEvidentiaryTimestamp(item.createdAt)) {
+                        delete item.createdAt;
+                    }
+                    if (item.completedAt && !isValidEvidentiaryTimestamp(item.completedAt)) {
+                        delete item.completedAt;
+                    }
+                    return item;
+                });
+            }
+
+            let loadedArchived = [];
+            if (savedArchived) {
+                const parsed = JSON.parse(savedArchived);
+                // MIGRATION: Ensure every archived task has a projectId, support fallback from legacy categoryId
+                loadedArchived = parsed.map(t => {
+                    const item = { ...t, projectId: t.projectId || t.categoryId || 'general' };
+                    if (item.projectColor) item.projectColor = migrateProjectColor(item.projectColor);
+                    if (item.color) item.color = migrateProjectColor(item.color);
+                    if (item.createdAt && !isValidEvidentiaryTimestamp(item.createdAt)) {
+                        delete item.createdAt;
+                    }
+                    if (item.completedAt && !isValidEvidentiaryTimestamp(item.completedAt)) {
+                        delete item.completedAt;
+                    }
+                    return item;
+                });
+            }
+
+            if (savedProjects) {
+                let parsed = JSON.parse(savedProjects);
+                // Ensure 'all' is excluded from storage state
+                parsed = parsed.filter(p => p.id !== 'all');
+                
+                // MIGRATION: Ensure General project exists dynamically so it can be edited/renamed by user
+                if (!parsed.some(p => p.id === 'general')) {
+                    parsed.unshift({ id: 'general', name: 'General', color: '#285a82' });
+                }
+                // MIGRATION: Migrate any project colors that changed or matched master priorities
+                parsed = parsed.map(p => ({
+                    ...p,
+                    color: migrateProjectColor(p.color)
+                }));
+                setProjects(parsed);
+            } else {
+                setProjects([{ id: 'general', name: 'General', color: '#285a82' }]);
+            }
+
+            let startCounter = 0;
+            if (savedCounter) startCounter = parseInt(savedCounter, 10);
+            
+            const savedTimestamp = localStorage.getItem(STORAGE_KEYS.TIMESTAMP);
+            if (savedTimestamp) setTimestamp(parseInt(savedTimestamp));
+
+            // Sanitize loaded tasks and assign unique IDs to resolve collisions
+            const sanitized = sanitizeTaskIds(loadedTasks, loadedArchived, startCounter);
+            const today = getTodayDateString();
+            const initialTasks = promoteDueScheduledTasks(sanitized.tasks, today);
+            setTasks(initialTasks);
+            setArchived(sanitized.archived);
+            setCounter(sanitized.counter);
+
+            // Request persistent browser storage to prevent IndexedDB eviction
+            requestPersistentStorage().catch(() => {});
+
+            // Cache any photos loaded from storage with dataUrl or thumbnail into IndexedDB
+            const photosToPersist = [
+                ...loadedTasks.flatMap(t => t.photos || []),
+                ...loadedArchived.flatMap(t => t.photos || [])
+            ].filter(p => p && p.id && (p.dataUrl || p.thumbnail));
+
+            if (photosToPersist.length > 0) {
+                savePhotos(photosToPersist).catch(err => console.warn('Could not cache loaded photos to IndexedDB:', err));
+            }
+
+            // Add sample tasks if new user
+            if (!savedTasks && !savedArchived) {
+                initializeSampleTasks();
+            }
+
+            // Prune orphaned task section persistence keys for deleted tasks
+            try {
+                const allValidIds = new Set([
+                    ...initialTasks.map(t => String(t.id)),
+                    ...sanitized.archived.map(t => String(t.id))
+                ]);
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith(STORAGE_KEYS.TASK_SECTIONS_PREFIX)) {
+                        const taskId = key.slice(STORAGE_KEYS.TASK_SECTIONS_PREFIX.length);
+                        if (!allValidIds.has(taskId)) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                });
+            } catch (pruneErr) {}
+
+            setIsLoaded(true);
+        } catch (error) {
+            console.error('Error loading data from localStorage:', error);
+            initializeSampleTasks();
+            setProjects(DEFAULT_PROJECTS.filter(p => p.id !== 'all'));
+            setIsLoaded(true);
+        }
+    }, [initializeSampleTasks]);
+
+    // Save data to localStorage whenever state changes
+    useEffect(() => {
+        if (!isLoaded) return;
+        try {
+            if (prevTasksRef.current !== tasks) {
+                const stTasks = sanitizeTasksForStorage(tasks);
+                localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(stTasks));
+                prevTasksRef.current = tasks;
+            }
+            if (prevArchivedRef.current !== archived) {
+                const stArchived = sanitizeTasksForStorage(archived);
+                localStorage.setItem(STORAGE_KEYS.ARCHIVE, JSON.stringify(stArchived));
+                prevArchivedRef.current = archived;
+            }
+            if (prevProjectsRef.current !== projects) {
+                localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+                prevProjectsRef.current = projects;
+            }
+            if (prevDeletedProjectsRef.current !== deletedProjects) {
+                localStorage.setItem(STORAGE_KEYS.DELETED_PROJECTS, JSON.stringify(deletedProjects));
+                prevDeletedProjectsRef.current = deletedProjects;
+            }
+            if (prevDeletedTasksRef.current !== deletedTaskKeys) {
+                localStorage.setItem(STORAGE_KEYS.DELETED_TASKS, JSON.stringify(deletedTaskKeys));
+                prevDeletedTasksRef.current = deletedTaskKeys;
+            }
+            if (prevCounterRef.current !== counter) {
+                localStorage.setItem(STORAGE_KEYS.COUNTER, counter.toString());
+                prevCounterRef.current = counter;
+            }
+            if (prevTimestampRef.current !== timestamp) {
+                localStorage.setItem(STORAGE_KEYS.TIMESTAMP, timestamp.toString());
+                prevTimestampRef.current = timestamp;
+            }
+        } catch (storageErr) {
+            console.warn('⚠️ LocalStorage save quota warning, performing safe recovery:', storageErr);
+            try {
+                // Non-destructive safe recovery: strip both dataUrl and thumbnail to pure metadata in storage
+                localStorage.setItem(STORAGE_KEYS.ARCHIVE, JSON.stringify(sanitizeTasksForStorage(archived, true)));
+                localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(sanitizeTasksForStorage(tasks, true)));
+            } catch (fallbackErr) {
+                console.error('Critical: LocalStorage write failed:', fallbackErr);
+            }
+        }
+
+        // SHADOW BACKUP STRATEGY: 
+        // Automatically create an internal snapshot every 24 hours
+        // This acts as a 'last known good state' internal to the browser.
+        const lastShadow = localStorage.getItem(STORAGE_KEYS.LAST_SHADOW_TIME);
+        const oneDay = 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        if (!lastShadow || (now - parseInt(lastShadow)) > oneDay) {
+            const snapshot = {
+                tasks: sanitizeTasksForStorage(tasks),
+                archived: sanitizeTasksForStorage(archived),
+                projects,
+                counter,
+                timestamp: now
+            };
+            try {
+                localStorage.setItem(STORAGE_KEYS.SHADOW_BACKUP, JSON.stringify(snapshot));
+                localStorage.setItem(STORAGE_KEYS.LAST_SHADOW_TIME, now.toString());
+                console.log('📦 Shadow backup created successfully.');
+            } catch (err) {
+                console.warn('⚠️ Could not save shadow backup (likely storage quota):', err);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tasks, archived, projects, deletedProjects, deletedTaskKeys, counter, timestamp, isLoaded]);
+
+    // Automatically promote due scheduled tasks when reaching their set day (or across midnight/focus)
+    useEffect(() => {
+        if (!isLoaded) return;
+        const checkPromotion = () => {
+            const today = getTodayDateString();
+            setTasks(prev => {
+                const needsPromotion = prev.some(t => 
+                    t && t.scheduledDate && t.scheduledDate <= today && t.promotedDate !== t.scheduledDate
+                );
+                if (!needsPromotion) return prev;
+                return promoteDueScheduledTasks(prev, today);
+            });
+        };
+
+        checkPromotion();
+        const interval = setInterval(checkPromotion, 60000);
+        window.addEventListener('visibilitychange', checkPromotion);
+        window.addEventListener('focus', checkPromotion);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('visibilitychange', checkPromotion);
+            window.removeEventListener('focus', checkPromotion);
+        };
+    }, [isLoaded]);
+
+    const addTask = useCallback((text, priority, projectId = 'general', notes = '', extraFields = {}) => {
+        const newId = counter + 1;
+        const now = Date.now();
+        const today = getTodayDateString();
+        const isScheduledToday = extraFields.scheduledDate && extraFields.scheduledDate <= today;
+        const newTask = {
+            id: newId,
+            text: text.trim(),
+            priority,
+            projectId: projectId || 'general',
+            notes: (notes || '').trim(),
+            isSample: false,
+            scheduledDate: extraFields.scheduledDate || null,
+            scheduledTime: extraFields.scheduledDate ? (extraFields.scheduledTime || null) : null,
+            promotedDate: isScheduledToday ? extraFields.scheduledDate : null,
+            deferCount: 0,
+            deferAlertDismissed: false,
+            subtasks: extraFields.subtasks || [],
+            isRecurring: extraFields.isRecurring || false,
+            recurrence: extraFields.recurrence || null,
+            completedAt: null,
+            createdAt: (extraFields.createdAt && isValidEvidentiaryTimestamp(extraFields.createdAt)) ? extraFields.createdAt : now,
+            updatedAt: now
+        };
+
+        setCounter(newId);
+        setTasks(prev => {
+            const listWithNew = insertTaskInTimeOrder(prev, newTask, today);
+            return promoteDueScheduledTasks(listWithNew, today);
+        });
+        setTimestamp(now);
+    }, [counter]);
+
+    const completeTask = useCallback((id) => {
+        const targetIdStr = String(id);
+        const now = Date.now();
+
+        setTasks(prevTasks => {
+            const taskIndex = prevTasks.findIndex(t => String(t.id) === targetIdStr);
+            if (taskIndex === -1) return prevTasks;
+
+            const taskToComplete = prevTasks[taskIndex];
+            const isRecurring = Boolean(taskToComplete.isRecurring || taskToComplete.recurrence);
+
+            if (isRecurring) {
+                const recurrenceProfile = (taskToComplete.recurrence && typeof taskToComplete.recurrence === 'object')
+                    ? taskToComplete.recurrence
+                    : { frequency: 1, interval: 'days', daysOfWeek: [] };
+                const today = getTodayDateString();
+                const baseDate = (taskToComplete.scheduledDate && taskToComplete.scheduledDate >= today)
+                    ? taskToComplete.scheduledDate
+                    : today;
+                let nextDate = calculateNextRecurrenceDate(baseDate, recurrenceProfile);
+                let safety = 0;
+                while (nextDate && nextDate <= today && safety < 50) {
+                    nextDate = calculateNextRecurrenceDate(nextDate, recurrenceProfile);
+                    safety++;
+                }
+                if (!nextDate) {
+                    nextDate = calculateNextRecurrenceDate(today, { frequency: 1, interval: 'days', daysOfWeek: [] });
+                }
+
+                const resetSubtasks = (taskToComplete.subtasks || []).map(st => ({
+                    ...st,
+                    completed: false
+                }));
+
+                const updatedRecurringTask = {
+                    ...taskToComplete,
+                    isRecurring: true,
+                    recurrence: recurrenceProfile,
+                    scheduledDate: nextDate,
+                    promotedDate: null,
+                    deferCount: 0,
+                    deferAlertDismissed: false,
+                    subtasks: resetSubtasks,
+                    completedAt: null,
+                    updatedAt: now
+                };
+
+                const newTasks = [...prevTasks];
+                newTasks[taskIndex] = updatedRecurringTask;
+                return newTasks;
+            }
+
+            const completedTask = {
+                ...taskToComplete,
+                isRecurring: false,
+                recurrence: null,
+                completedAt: now,
+                updatedAt: now
+            };
+
+            setArchived(prevArchived => [
+                completedTask,
+                ...prevArchived.filter(a => String(a.id) !== targetIdStr)
+            ]);
+
+            const newTasks = [...prevTasks];
+            newTasks.splice(taskIndex, 1);
+            return newTasks;
+        });
+
+        setTimestamp(now);
+    }, []);
+
+    const deleteArchivedTask = useCallback((id) => {
+        setArchived(prevArchived => {
+            const taskToDelete = prevArchived.find(t => String(t.id) === String(id));
+            if (taskToDelete) {
+                const keysToAdd = [`id_${id}`];
+                const cleanText = (taskToDelete.text || '').trim().toLowerCase();
+                const projId = taskToDelete.projectId || taskToDelete.categoryId || 'general';
+                if (cleanText) keysToAdd.push(`${cleanText}::${projId}`);
+                setDeletedTaskKeys(prev => Array.from(new Set([...prev, ...keysToAdd])));
+            } else {
+                setDeletedTaskKeys(prev => Array.from(new Set([...prev, `id_${id}`])));
+            }
+            return prevArchived.filter(t => String(t.id) !== String(id));
+        });
+        setTasks(prevTasks => prevTasks.filter(t => String(t.id) !== String(id)));
+        try {
+            localStorage.removeItem(`${STORAGE_KEYS.TASK_SECTIONS_PREFIX}${id}`);
+        } catch (e) {}
+        setTimestamp(Date.now());
+    }, []);
+
+    const restoreTask = useCallback((id, priority) => {
+        setArchived(prev => {
+            const taskIndex = prev.findIndex(t => String(t.id) === String(id));
+            if (taskIndex === -1) return prev;
+
+            const newArchived = [...prev];
+            const [task] = newArchived.splice(taskIndex, 1);
+            const now = Date.now();
+            const restoredTask = {
+                ...task,
+                priority: (priority !== undefined && [1, 2, 3, 4].includes(priority)) ? priority : (task.priority || 1),
+                restoredAt: now,
+                updatedAt: now
+            };
+            delete restoredTask.completedAt;
+
+            setDeletedTaskKeys(prev => prev.filter(k => k !== `id_${id}`));
+            setTasks(current => [restoredTask, ...current]);
+            return newArchived;
+        });
+        setTimestamp(Date.now());
+    }, []);
+
+    const updateTask = useCallback((id, updates) => {
+        const today = getTodayDateString();
+        const now = Date.now();
+        setTasks(prev => {
+            let updatedTaskObj = null;
+            const updated = prev.map(task => {
+                if (String(task.id) === String(id)) {
+                    const finalUpdates = { ...updates };
+                    const oldIsActive = !task.scheduledDate || task.scheduledDate <= today;
+                    const newIsFuture = updates.scheduledDate && updates.scheduledDate > today;
+                    
+                    if (oldIsActive && newIsFuture) {
+                        finalUpdates.deferCount = (task.deferCount || 0) + 1;
+                    }
+                    if (updates.scheduledDate && updates.scheduledDate !== task.scheduledDate) {
+                        finalUpdates.promotedDate = null;
+                    }
+                    if (updates.scheduledDate === null && updates.scheduledTime === undefined) {
+                        finalUpdates.scheduledTime = null;
+                    }
+                    
+                    updatedTaskObj = { ...task, ...finalUpdates, updatedAt: now, isSample: false };
+                    return updatedTaskObj;
+                }
+                return task;
+            });
+
+            if (updatedTaskObj) {
+                const timeChanged = updates.scheduledTime !== undefined;
+                const dateChanged = updates.scheduledDate !== undefined;
+                const priorityChanged = updates.priority !== undefined;
+                const isActive = !updatedTaskObj.scheduledDate || updatedTaskObj.scheduledDate <= today;
+
+                if ((timeChanged || dateChanged || priorityChanged) && updatedTaskObj.scheduledTime && isActive) {
+                    const withoutTask = updated.filter(t => String(t.id) !== String(id));
+                    const reordered = insertTaskInTimeOrder(withoutTask, updatedTaskObj, today);
+                    return promoteDueScheduledTasks(reordered, today);
+                }
+            }
+
+            return promoteDueScheduledTasks(updated, today);
+        });
+        setTimestamp(now);
+    }, []);
+
+    const reorderTasks = useCallback((draggedId, targetId) => {
+        if (!draggedId || !targetId) return;
+        const now = Date.now();
+        setTasks(prev => {
+            const dragStr = String(draggedId);
+            const targetStr = String(targetId);
+
+            const fromIndex = prev.findIndex(t => String(t.id) === dragStr);
+            if (fromIndex === -1) return prev;
+
+            // Handle dropping directly onto a priority section header or background (e.g. priority-1)
+            if (targetStr.startsWith('priority-')) {
+                const newPriority = parseInt(targetStr.split('-')[1], 10);
+                if (![1, 2, 3, 4].includes(newPriority)) return prev;
+
+                const newTasks = [...prev];
+                const [movedTask] = newTasks.splice(fromIndex, 1);
+                movedTask.priority = newPriority;
+                movedTask.updatedAt = now;
+                if (movedTask.scheduledDate) {
+                    movedTask.promotedDate = movedTask.scheduledDate;
+                }
+
+                // Append at the bottom of the target priority section for natural dropping
+                let lastPriorityIdx = -1;
+                for (let i = newTasks.length - 1; i >= 0; i--) {
+                    if (newTasks[i].priority === newPriority) {
+                        lastPriorityIdx = i;
+                        break;
+                    }
+                }
+
+                if (lastPriorityIdx > -1) {
+                    newTasks.splice(lastPriorityIdx + 1, 0, movedTask);
+                } else {
+                    let insertIdx = newTasks.findIndex(t => t.priority > newPriority);
+                    if (insertIdx === -1) insertIdx = newTasks.length;
+                    newTasks.splice(insertIdx, 0, movedTask);
+                }
+                return newTasks;
+            }
+
+            // Handle dropping directly onto a project section header or container (e.g. project-work)
+            if (targetStr.startsWith('project-')) {
+                const targetProjId = targetStr.replace('project-', '');
+                if (!targetProjId) return prev;
+
+                const newTasks = [...prev];
+                const [movedTask] = newTasks.splice(fromIndex, 1);
+                movedTask.projectId = targetProjId;
+                movedTask.updatedAt = now;
+                if (movedTask.scheduledDate) {
+                    movedTask.promotedDate = movedTask.scheduledDate;
+                }
+
+                let lastProjIdx = -1;
+                for (let i = newTasks.length - 1; i >= 0; i--) {
+                    if ((newTasks[i].projectId || 'general').toLowerCase() === targetProjId.toLowerCase()) {
+                        lastProjIdx = i;
+                        break;
+                    }
+                }
+
+                if (lastProjIdx > -1) {
+                    newTasks.splice(lastProjIdx + 1, 0, movedTask);
+                } else {
+                    newTasks.push(movedTask);
+                }
+                return newTasks;
+            }
+
+            // Handle standard task-to-task reordering
+            const targetIndex = prev.findIndex(t => String(t.id) === targetStr);
+            if (targetIndex === -1 || fromIndex === targetIndex) return prev;
+
+            const targetTask = prev[targetIndex];
+            const newTasks = [...prev];
+            const [movedTask] = newTasks.splice(fromIndex, 1);
+            movedTask.priority = targetTask.priority;
+            movedTask.updatedAt = now;
+            if (movedTask.scheduledDate) {
+                movedTask.promotedDate = movedTask.scheduledDate;
+            }
+            if (targetTask.scheduledDate) {
+                targetTask.promotedDate = targetTask.scheduledDate;
+            }
+
+            const newTargetIndex = newTasks.findIndex(t => String(t.id) === targetStr);
+            if (newTargetIndex === -1) {
+                newTasks.splice(fromIndex, 0, movedTask);
+                return newTasks;
+            }
+
+            // Always insert at newTargetIndex (before target task), aligning precisely with the top drop indicator line
+            newTasks.splice(newTargetIndex, 0, movedTask);
+            return newTasks;
+        });
+        setTimestamp(now);
+    }, []);
+
+    const addProject = useCallback((name, color) => {
+        const id = name.toLowerCase().replace(/\s+/g, '-');
+        setDeletedProjects(prev => prev.filter(dpId => dpId !== id));
+        if (projects.some(p => p.id === id)) return id;
+
+        const maxProjects = getMaxProjects();
+        const customProjects = projects.filter(p => p.id !== 'all');
+        if (customProjects.length >= maxProjects) {
+            return null;
+        }
+
+        const newProject = { id, name, color };
+        setProjects(prev => [...prev, newProject]);
+        setTimestamp(Date.now());
+        return id;
+    }, [projects]);
+
+    const updateProject = useCallback((id, updates) => {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+        setTimestamp(Date.now());
+    }, []);
+
+    const deleteProject = useCallback((id, targetProjectId = 'general') => {
+        if (id === 'all') return; // Only 'all' is protected now
+        setProjects(prev => prev.filter(p => p.id !== id));
+        setDeletedProjects(prev => Array.from(new Set([...prev, id])));
+        // Reset tasks in this project to the target project (defaults to general)
+        setTasks(prev => prev.map(t => t.projectId === id ? { ...t, projectId: targetProjectId } : t));
+        setArchived(prev => prev.map(t => t.projectId === id ? { ...t, projectId: targetProjectId } : t));
+        setTimestamp(Date.now());
+    }, []);
+
+    const moveProject = useCallback((id, direction) => {
+        setProjects(prev => {
+            const index = prev.findIndex(p => p.id === id);
+            if (index === -1) return prev;
+            const targetIndex = direction === 'up' ? index - 1 : index + 1;
+            if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+
+            const updated = [...prev];
+            const [moved] = updated.splice(index, 1);
+            updated.splice(targetIndex, 0, moved);
+            return updated;
+        });
+        setTimestamp(Date.now());
+    }, []);
+
+    const reorderProjects = useCallback((reorderedList) => {
+        setProjects(reorderedList);
+        setTimestamp(Date.now());
+    }, []);
+
+    const importData = useCallback((data) => {
+        // Map tasks and fallback legacy categoryId to projectId
+        const mappedTasks = (data.tasks || []).map(t => {
+            const item = { ...t, projectId: t.projectId || t.categoryId || 'general' };
+            if (item.projectColor) item.projectColor = migrateProjectColor(item.projectColor);
+            if (item.color) item.color = migrateProjectColor(item.color);
+            return item;
+        });
+        const mappedArchived = (data.archived || []).map(t => {
+            const item = { ...t, projectId: t.projectId || t.categoryId || 'general' };
+            if (item.projectColor) item.projectColor = migrateProjectColor(item.projectColor);
+            if (item.color) item.color = migrateProjectColor(item.color);
+            return item;
+        });
+        let mappedProjects = (data.projects || data.categories || [{ id: 'general', name: 'General', color: '#285a82' }]).map(p => ({
+            ...p,
+            color: migrateProjectColor(p.color)
+        }));
+        
+        // MIGRATION: Ensure General project exists dynamically in imported projects
+        if (!mappedProjects.some(p => p.id === 'general')) {
+            mappedProjects.unshift({ id: 'general', name: 'General', color: '#285a82' });
+        }
+
+        // Sanitize imported tasks to resolve duplicate ID collisions
+        const sanitized = sanitizeTaskIds(mappedTasks, mappedArchived, data.counter || 0);
+
+        setTasks(sanitized.tasks);
+        setArchived(sanitized.archived);
+        setProjects(mappedProjects);
+        if (Array.isArray(data.deletedProjects)) {
+            setDeletedProjects(data.deletedProjects);
+        }
+        if (Array.isArray(data.deletedTaskKeys)) {
+            setDeletedTaskKeys(data.deletedTaskKeys);
+        }
+        setCounter(sanitized.counter);
+        if (data.timestamp) setTimestamp(data.timestamp);
+
+        if (data.dateFormat) {
+            try {
+                localStorage.setItem(STORAGE_KEYS.DATE_FORMAT, data.dateFormat);
+            } catch (e) {}
+        }
+        if (data.taskLengthLimit) {
+            try {
+                localStorage.setItem(STORAGE_KEYS.TASK_LENGTH_LIMIT, data.taskLengthLimit);
+            } catch (e) {}
+        }
+
+        if (data.adminPasswordHash) {
+            try {
+                localStorage.setItem(STORAGE_KEYS.ADMIN_PASSWORD_HASH || '123TodoAdminPassHash', data.adminPasswordHash);
+            } catch (e) {}
+        }
+
+        // Also update shadow backup upon successful manual import
+        try {
+            const now = Date.now();
+            const snapshot = {
+                tasks: sanitized.tasks,
+                archived: sanitized.archived,
+                projects: mappedProjects,
+                counter: sanitized.counter,
+                timestamp: now
+            };
+            localStorage.setItem(STORAGE_KEYS.SHADOW_BACKUP, JSON.stringify(snapshot));
+            localStorage.setItem(STORAGE_KEYS.LAST_SHADOW_TIME, now.toString());
+        } catch (e) {
+            console.error('Shadow update on import failed:', e);
+        }
+    }, []);
+
+    const recoverFromShadow = useCallback(() => {
+        const shadowRaw = localStorage.getItem(STORAGE_KEYS.SHADOW_BACKUP);
+        if (!shadowRaw) return false;
+        try {
+            const data = JSON.parse(shadowRaw);
+            importData(data);
+            return true;
+        } catch (e) {
+            console.error('Failed to recover from shadow backup:', e);
+            return false;
+        }
+    }, [importData]);
+
+    const bulkAddTasks = useCallback((tasksToAdd) => {
+        if (tasksToAdd.length === 0) return;
+
+        let currentId = counter;
+        const tasksWithIds = tasksToAdd.map(t => {
+            currentId++;
+            return {
+                ...t,
+                id: currentId,
+                isSample: false
+            };
+        });
+
+        setCounter(currentId);
+        setTasks(prev => [...tasksWithIds, ...prev]);
+        setTimestamp(Date.now());
+    }, [counter]);
+
+    const addNote = useCallback((text, notes = '', projectId = 'general', extraFields = {}) => {
+        const newId = counter + 1;
+        const now = Date.now();
+        let finalTitle = (text || '').trim();
+        let finalNotes = (notes || '').trim();
+
+        if (!finalTitle && finalNotes) {
+            finalTitle = finalNotes;
+            finalNotes = '';
+        }
+        if (!finalTitle) {
+            if (extraFields && extraFields.photos && extraFields.photos.length > 0) {
+                finalTitle = `Photo Note (${extraFields.photos.length})`;
+            } else {
+                finalTitle = 'Untitled Note';
+            }
+        }
+
+        const newNote = {
+            id: newId,
+            text: finalTitle,
+            priority: 1, // Auto set to Must Do (Priority 1)
+            projectId: projectId || 'general',
+            notes: finalNotes,
+            isSample: false,
+            scheduledDate: null,
+            deferCount: 0,
+            deferAlertDismissed: false,
+            subtasks: [],
+            isRecurring: false,
+            recurrence: null,
+            completedAt: null,
+            createdAt: now,
+            updatedAt: now,
+            photos: (extraFields && extraFields.photos) || [],
+            ...(extraFields || {})
+        };
+
+        setCounter(newId);
+        setTasks(prev => {
+            const todayStr = getTodayDateString();
+            // Place new note at the bottom of the Priority 1 ("1 Must Do") section
+            let lastP1Idx = -1;
+            for (let i = prev.length - 1; i >= 0; i--) {
+                const t = prev[i];
+                const isP1 = (t.priority || 1) === 1;
+                const isActive = !t.scheduledDate || t.scheduledDate <= todayStr;
+                if (isP1 && isActive) {
+                    lastP1Idx = i;
+                    break;
+                }
+            }
+            if (lastP1Idx !== -1) {
+                const nextList = [...prev];
+                nextList.splice(lastP1Idx + 1, 0, newNote);
+                return nextList;
+            }
+            // If no active priority 1 tasks exist, place before any higher priority number (e.g. 2, 3, 4)
+            let insertIdx = prev.findIndex(t => {
+                const isActive = !t.scheduledDate || t.scheduledDate <= todayStr;
+                return isActive && (t.priority || 1) > 1;
+            });
+            if (insertIdx === -1) insertIdx = 0;
+            const nextList = [...prev];
+            nextList.splice(insertIdx, 0, newNote);
+            return nextList;
+        });
+        setTimestamp(now);
+        return newId;
+    }, [counter]);
+
+    const convertNoteToTask = useCallback((id, priority = 1, scheduledDate = null, projectId = null) => {
+        const now = Date.now();
+        setTasks(prev => prev.map(task => {
+            if (String(task.id) === String(id)) {
+                return {
+                    ...task,
+                    priority: priority || 1,
+                    scheduledDate: scheduledDate !== undefined ? scheduledDate : task.scheduledDate,
+                    projectId: projectId || task.projectId || 'general',
+                    updatedAt: now
+                };
+            }
+            return task;
+        }));
+        setTimestamp(now);
+    }, []);
+
+    const bulkAssignProject = useCallback((taskIds, targetProjectId) => {
+        if (!taskIds || taskIds.length === 0 || !targetProjectId) return;
+        const idStrs = new Set(taskIds.map(id => String(id)));
+        const now = Date.now();
+        setTasks(prev => prev.map(task => {
+            if (idStrs.has(String(task.id))) {
+                return {
+                    ...task,
+                    projectId: targetProjectId,
+                    updatedAt: now
+                };
+            }
+            return task;
+        }));
+        setTimestamp(now);
+    }, []);
+
+    return {
+        tasks,
+        archived,
+        projects,
+        deletedProjects,
+        deletedTaskKeys,
+        counter,
+        timestamp,
+        addTask,
+        addNote,
+        convertNoteToTask,
+        bulkAssignProject,
+        completeTask,
+        deleteArchivedTask,
+        restoreTask,
+        updateTask,
+        reorderTasks,
+        addProject,
+        updateProject,
+        deleteProject,
+        moveProject,
+        reorderProjects,
+        importData,
+        bulkAddTasks,
+        recoverFromShadow
+    };
+};
